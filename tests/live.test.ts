@@ -1,3 +1,4 @@
+import { testUser } from './identity';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -143,6 +144,7 @@ beforeEach(async () => {
     "delete from interview_sessions; delete from rate_buckets;",
   );
   api = createApi({
+    authenticate: async () => testUser,
     db,
     ai: () => ai,
     dataMode: "illustrative",

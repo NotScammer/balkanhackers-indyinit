@@ -16,11 +16,11 @@ export function payloadHash(input: CompleteTurnRequest) {
 }
 export class InterviewService {
   constructor(private db: Database, private ai: StructuredAI, private dataMode: Forecast['data_mode']) {}
-  async create(input: CreateSessionRequest): Promise<CreateSessionResponse> {
+  async create(input: CreateSessionRequest, ownerId: string): Promise<CreateSessionResponse> {
     validateCombination(input);
     const { token, hash } = newCapability(); const id = randomUUID();
     const q = await generateQuestion(this.db, this.ai, input, [], decideNext(input.round, [], null), this.dataMode);
-    await this.db.rpc('create_interview', { p_s: { ...input, id, tokenHash: hash, totalTurns: INTERVIEW.turns, dataMode: this.dataMode, expiresAt: new Date(Date.now() + INTERVIEW.expiryHours * 3600000).toISOString() }, p_q: q });
+    await this.db.rpc('create_interview', { p_s: { ...input, id, ownerId, tokenHash: hash, totalTurns: INTERVIEW.turns, dataMode: this.dataMode, expiresAt: new Date(Date.now() + INTERVIEW.expiryHours * 3600000).toISOString() }, p_q: q });
     const state = await this.db.snapshot(id);
     if (!state) throw new AppError('DATABASE_UNAVAILABLE', 503, 'Created session could not be retrieved.', true);
     return { ...sessionView(state), sessionToken: token };

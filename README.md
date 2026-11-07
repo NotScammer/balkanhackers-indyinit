@@ -1,12 +1,14 @@
 # AI Interview Simulator
 
+> **Authentication update:** Google OAuth through Supabase is required to use interviews. Apply migration 004 and configure the provider, callback URLs, `SUPABASE_PUBLISHABLE_KEY`, and `APP_URL` using [OAuth setup](docs/OAUTH_SETUP.md). Private routes require the signed-in owner plus the existing interview token.
+
 > **Backend update:** The implemented dynamic, research-grounded backend contract supersedes conflicting older MVP sections below. See [Backend architecture](docs/BACKEND_ARCHITECTURE.md), [Frontend integration](docs/FRONTEND_INTEGRATION.md), and [setup/migrations/deployment](docs/SETUP.md). Feedback stays private until completion; submit answers to `/api/v1/sessions/:sessionId/turns/complete`.
 
 ## Current live interview
 
 The real API mode now uses natural live audio, spoken feedback, clarification and up to two extra follow-ups for each of three main questions. Scores appear only at the end, combining each main answer with its follow-ups. Transcripts advance automatically and remain correctable. See [live interview setup and architecture](docs/LIVE_INTERVIEW.md).
 
-Apply **all three** migrations, configure the database and model credentials, seed research, and rebuild. The interface always uses live conversation; the old recorded-answer screen has been removed. The recorded-upload endpoints below remain for compatibility; they are not the live conversation transport.
+Apply **all four** migrations, configure the database and model credentials, seed research, and rebuild. The interface always uses live conversation; the old recorded-answer screen has been removed. The recorded-upload endpoints below remain for compatibility; they are not the live conversation transport.
 
 ## Integrated app: deployment
 
@@ -14,7 +16,7 @@ Both branches are integrated into one Next.js website. The voice interface uses 
 
 1. Use Node.js 22.12+ and run `npm ci`.
 2. Copy `.env.example` to `.env.local`. Configure Supabase, Claude and OpenAI keys/models, plus `RATE_LIMIT_SALT`.
-3. Apply all three SQL migrations and seed forecasts using [docs/SETUP.md](docs/SETUP.md). Question generation requires seeded research.
+3. Apply all four SQL migrations and seed forecasts using [docs/SETUP.md](docs/SETUP.md). Question generation requires seeded research.
 4. Run `npm test`, `npm run lint`, `npm run typecheck`, and `npm run build`.
 5. Run `npm start`, or deploy the repository as a Next.js project on Vercel with the same environment settings. Configure the database and seed before opening access.
 
@@ -22,7 +24,7 @@ For other Node hosts, use `npm run build` then `npm start`. Docker is also suppo
 
 Set `OPENAI_TTS_MODEL` and `OPENAI_TRANSCRIPTION_MODEL` to account-supported audio models. `OPENAI_TTS_VOICE` defaults to `alloy` when blank. Realtime settings are only needed by optional Realtime clients. Audio uploads are capped at 4 MiB; shorten larger recordings. Audio is not stored by this application. Provider retention may differ.
 
-Live adaptive questions are generated between assessed turns. Scripted clarification remains fixture-only. Accounts are labeled previews; guest sessions use private capability tokens. Session expiry blocks access; physical database cleanup must be configured separately. Live microphone/provider behavior and hosted database setup still require verification with deployment credentials.
+Live adaptive questions are generated between assessed turns. Scripted clarification remains fixture-only. Google OAuth is required; interviews belong to the verified Supabase user and also require their session capability token. Session expiry blocks access; physical database cleanup must be configured separately. Live microphone/provider behavior and hosted database setup still require verification with deployment credentials.
 
 The specification below records the original plan. See [FRONTEND.md](FRONTEND.md) for the current voice-only interface.
 

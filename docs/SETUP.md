@@ -1,5 +1,7 @@
 # Backend setup and deployment
 
+Google OAuth is required. Complete [OAUTH_SETUP.md](OAUTH_SETUP.md), including the Google/Supabase provider settings, app callback allowlist, `SUPABASE_PUBLISHABLE_KEY`, `APP_URL` and migration 004, before using interview endpoints.
+
 ## Local setup
 
 Use Node.js 22.12+ (Node 24 was used for implementation) and npm.
@@ -11,12 +13,14 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Only the public catalog and setup interface work without configuration. Private API operations fail with `NOT_CONFIGURED` until the server environment is valid. No secrets are needed for tests or builds.
+The catalog remains public. Setup, interview and results pages require Google sign-in; missing Auth configuration shows an unavailable sign-in screen. Private API operations fail with `NOT_CONFIGURED` until the server environment is valid. No secrets are needed for tests or builds.
 
 | Variable | Get it from / feature |
 | --- | --- |
 | `SUPABASE_URL` | Supabase project → Settings/API → project URL; all private data |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase project API keys → server service-role key; server only, bypasses RLS |
+| `SUPABASE_PUBLISHABLE_KEY` | Supabase project API keys → publishable key (or legacy anon key); used by server-side OAuth clients |
+| `APP_URL` | Exact app origin: `http://localhost:3000` locally, deployed HTTPS origin on Vercel; used for OAuth callbacks and Origin checks |
 | `ANTHROPIC_API_KEY` | [Claude Console](https://platform.claude.com/) API keys; questions, evaluations and research analysis |
 | `ANTHROPIC_MODEL` | A model available to your account supporting [structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs); explicit ID required, no hardcoded default |
 | `OPENAI_API_KEY` | [OpenAI project API keys](https://platform.openai.com/api-keys); speech, transcription and optional Realtime voice |
@@ -44,7 +48,8 @@ SQL Editor method:
 2. Run **all** of `supabase/migrations/202611070001_backend.sql` once.
 3. Run **all** of `supabase/migrations/202611070002_research_persistence.sql` once.
 4. Run **all** of `supabase/migrations/202611070003_live_conversation.sql` once.
-5. Confirm all three transactions succeeded. Run the read-only verification queries below.
+5. Run **all** of `supabase/migrations/202611070004_oauth_ownership.sql` once.
+6. Confirm all four transactions succeeded. Run the read-only verification queries below.
 
 Supabase CLI method (install the CLI separately using its official instructions):
 
@@ -104,7 +109,7 @@ npm run build
 npm run smoke # briefly serves the production build on localhost:3107
 ```
 
-Local verification passed: 35 tests, TypeScript checks, lint, production build and the production HTTP smoke test. The dependency audit reported zero vulnerabilities after a patched development dependency override.
+Local verification passed: 110 tests (22 frontend and 88 backend), TypeScript checks, lint, production build and the production HTTP smoke test. The dependency audit reported zero vulnerabilities after a patched development dependency override.
 
 Tests use no paid APIs or external database. They execute migrations and verify auth, hashing, expiry, idempotency/concurrency, scoring, privacy, reports, state recovery, source parsing, evidence validation, forecasting and cron locks/policies. Model quality and browser audio still require an account-backed rehearsal.
 
@@ -138,7 +143,7 @@ Immediate access expiry is implemented. Eventual cleanup runs at the beginning o
 
 ## Account-backed rehearsal remaining
 
-- [ ] Apply/verify all three hosted migrations and server role grants.
+- [ ] Apply/verify all four hosted migrations and server role grants.
 - [ ] Load actual metadata through the verified seed; confirm `dataMode: verified` in creation.
 - [ ] Complete three typed turns using live Claude, check persisted questions/evaluations and final arithmetic.
 - [ ] Retry one successful answer with the same payload; confirm unchanged result and no additional model call.

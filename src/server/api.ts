@@ -12,9 +12,11 @@ import { AnthropicAI, type StructuredAI } from './providers/anthropic';
 import { issueRealtimeToken } from './realtime';
 import { SupabaseDatabase } from './storage/supabase';
 import type { Database, Forecast, Snapshot } from './storage/types';
+import { requireUser, type Authenticator } from './oauth/identity';
 export interface ApiDependencies {
   db: Database; ai: () => StructuredAI; dataMode: Forecast['data_mode']; rateSalt: string; dailyLimit: number;
   realtime: (state: Snapshot) => Promise<unknown>;
+  authenticate?: Authenticator;
 }
 export function createApi(deps: ApiDependencies) {
   const { db } = deps;
@@ -24,11 +26,11 @@ export function createApi(deps: ApiDependencies) {
   return {
     live: createLiveApi(deps),
     frontendGet: (request: Request, id: string) => handle(async () => {
-      const state = await authorize(db, sessionId(id), request);
+      const state = await authorize(db, sessionId(id), request, deps.authenticate);
       return json({ ...sessionView(state), answers: state.answers.filter(a => a.processing_status === 'done' && a.evaluation).map(a => ({ answerId: a.id, questionId: a.question_id, transcript: a.transcript, evaluation: answerEvaluation(a.evaluation!) })) });
     }),
     frontendComplete: (request: Request, id: string) => handle(async () => {
-      const state = await authorize(db, sessionId(id), request);
+      const state = await authorize(db, sessionId(id), request, deps.authenticate);
       const input = await body(request, completeTurnSchema);
       const ai: StructuredAI = { get model() { return deps.ai().model; }, generate: (...args) => deps.ai().generate(...args) };
       const result = await new InterviewService(db, ai, deps.dataMode).complete(state, input);
@@ -39,36 +41,38 @@ export function createApi(deps: ApiDependencies) {
     }),
     catalog: () => handle(async () => json(catalog)),
     create: (request: Request) => handle(async () => {
+      const user = await (deps.authenticate ?? requireUser)(request);
       const input = await body(request, createSessionSchema); validateCombination(input);
       await rate('create:global', deps.dailyLimit, 86400);
+      await rate(`create:user:${hashToken(deps.rateSalt + user.id)}`, 10, 3600);
       // Vercel overwrites x-vercel-forwarded-for. Untrusted forwarded headers are ignored elsewhere.
       const ip = process.env.VERCEL ? request.headers.get('x-vercel-forwarded-for') ?? 'unknown' : 'local';
       await rate(`create:${hashToken(deps.rateSalt + ip)}`, 10, 3600);
-      return json(await new InterviewService(db, deps.ai(), deps.dataMode).create(input), 201);
+      return json(await new InterviewService(db, deps.ai(), deps.dataMode).create(input, user.id), 201);
     }),
-    get: (request: Request, id: string) => handle(async () => json(sessionView(await authorize(db, sessionId(id), request)))),
+    get: (request: Request, id: string) => handle(async () => json(sessionView(await authorize(db, sessionId(id), request, deps.authenticate)))),
     complete: (request: Request, id: string) => handle(async () => {
-      const state = await authorize(db, sessionId(id), request);
+      const state = await authorize(db, sessionId(id), request, deps.authenticate);
       const input = await body(request, completeTurnSchema);
       // Lazy AI construction allows a stored successful response to be retried during provider outages.
       const ai: StructuredAI = { get model() { return deps.ai().model; }, generate: (...args) => deps.ai().generate(...args) };
       return json(await new InterviewService(db, ai, deps.dataMode).complete(state, input));
     }),
     report: (request: Request, id: string) => handle(async () => {
-      const state = await authorize(db, sessionId(id), request);
+      const state = await authorize(db, sessionId(id), request, deps.authenticate);
       if (state.session.status !== 'completed' || !state.report) throw new AppError('SESSION_INCOMPLETE', 409, 'Private feedback is available only after all required turns are assessed.');
       return json(state.report);
     }),
     end: (request: Request, id: string) => handle(async () => {
-      await authorize(db, sessionId(id), request);
+      await authorize(db, sessionId(id), request, deps.authenticate);
       await db.rpc('end_interview', { p_session_id: id });
       return json(sessionView((await db.snapshot(id))!));
     }),
     remove: (request: Request, id: string) => handle(async () => {
-      await authorize(db, sessionId(id), request); await db.deleteSession(id); return json(null, 204);
+      await authorize(db, sessionId(id), request, deps.authenticate); await db.deleteSession(id); return json(null, 204);
     }),
     realtime: (request: Request, id: string) => handle(async () => {
-      const state = await authorize(db, sessionId(id), request);
+      const state = await authorize(db, sessionId(id), request, deps.authenticate);
       if (!state.session.audio_processing_consent) throw new AppError('AUDIO_CONSENT_REQUIRED', 403, 'Audio processing consent is required.');
       if (state.session.status !== 'active') throw new AppError('SESSION_INCOMPLETE', 409, 'Voice requires an active session.');
       await rate(`realtime:${id}`, 6, 3600); await rate('realtime:global', 100, 86400);

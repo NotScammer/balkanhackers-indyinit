@@ -1,3 +1,5 @@
+> Google OAuth update: every private/live endpoint also requires the signed-in Supabase owner. See [OAuth setup](OAUTH_SETUP.md).
+
 # Live interview
 
 ## Agreed behavior

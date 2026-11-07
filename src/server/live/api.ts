@@ -15,7 +15,7 @@ export function createLiveApi(deps: ApiDependencies) {
   };
   const service = new LiveService(deps.db, ai);
   async function state(request: Request, id: string) {
-    const snapshot = await authorize(deps.db, sessionId(id), request);
+    const snapshot = await authorize(deps.db, sessionId(id), request, deps.authenticate);
     if (!snapshot.session.audio_processing_consent)
       throw new AppError(
         "AUDIO_CONSENT_REQUIRED",

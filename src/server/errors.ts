@@ -3,6 +3,7 @@ export class AppError extends Error {
   constructor(public code: string, public status: number, message: string, public retryable = false) { super(message); }
 }
 const dbCodes: Record<string, [number, string, boolean]> = {
+  UNAUTHORIZED: [401, 'Sign in to create an interview.', false],
   SESSION_UNAVAILABLE: [404, 'Session unavailable or expired.', false],
   IDEMPOTENCY_CONFLICT: [409, 'This answer ID was already used with another payload.', false],
   EVALUATION_IN_PROGRESS: [409, 'A turn is being processed. Retry the same answer ID.', true],

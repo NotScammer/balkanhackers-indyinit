@@ -1,4 +1,5 @@
 import type { InterviewApi } from "./contracts";
+import { safeReturnPath } from "../auth-paths";
 // The product always uses live conversation. Fixtures remain available to isolated tests.
 export const isMock = false;
 export const tokenKey = (id: string) =>
@@ -36,6 +37,7 @@ export async function request<T>(
     ...init,
     headers,
     cache: "no-store",
+    credentials: "same-origin",
     signal: AbortSignal.timeout(180000),
   });
   if (!response.ok) {
@@ -46,6 +48,9 @@ export async function request<T>(
       code = data.error?.code ?? code;
       retryable = data.error?.retryable === true;
     } catch {}
+    if (response.status === 401 && typeof window !== 'undefined') {
+      window.location.assign(new URL(`/login?returnTo=${encodeURIComponent(safeReturnPath(window.location.pathname))}`, window.location.origin).href);
+    }
     const raw = response.headers.get("Retry-After");
     const delay = raw
       ? /^\d+$/.test(raw)

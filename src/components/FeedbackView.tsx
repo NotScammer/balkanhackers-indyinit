@@ -109,13 +109,12 @@ export function ReportView({ report }: { report: SessionReport }) {
       <hr />
       <h3>Save your practice</h3>
       <p>
-        Accounts are still a preview. You can read this report without signing
-        in.
+        Your report is private to your signed-in account and interview session.
       </p>
       <Link
         href={`/login?returnTo=${encodeURIComponent(`/results/${report.sessionId}`)}`}
       >
-        Preview an account
+        Your account
       </Link>
     </>
   );

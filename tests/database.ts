@@ -2,6 +2,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { readFile } from 'node:fs/promises';
 import type { Database, Forecast, Snapshot } from '../src/server/storage/types';
 import { databaseError } from '../src/server/errors';
+import { testUser, otherUser } from './identity';
 export class TestDatabase implements Database {
   constructor(public sql: PGlite) {}
   static async create() {
@@ -10,6 +11,10 @@ export class TestDatabase implements Database {
     await sql.exec(await readFile('supabase/migrations/202611070001_backend.sql', 'utf8'));
     await sql.exec(await readFile('supabase/migrations/202611070002_research_persistence.sql', 'utf8'));
     await sql.exec(await readFile('supabase/migrations/202611070003_live_conversation.sql', 'utf8'));
+    // Supabase provides auth.users in production. Emulate only its referenced ID here.
+    await sql.exec('create schema auth; create table auth.users(id uuid primary key);');
+    await sql.query('insert into auth.users(id) values($1),($2)', [testUser.id, otherUser.id]);
+    await sql.exec(await readFile('supabase/migrations/202611070004_oauth_ownership.sql', 'utf8'));
     return new TestDatabase(sql);
   }
   async rpc<T>(name: string, args: Record<string, unknown> = {}): Promise<T> {

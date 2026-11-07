@@ -1,5 +1,7 @@
 # Backend architecture (Developer B)
 
+OAuth update: Google sign-in is now required. Every interview is tied to the verified Supabase user and private access also requires the existing interview capability. [OAuth setup and migration 004](OAUTH_SETUP.md) supersedes the anonymous-access descriptions below.
+
 This contract supersedes conflicting sections of the original README. The backend uses Next.js App Router on Node.js, Supabase PostgreSQL, Claude for structured dynamic questions/private evaluation, and OpenAI Realtime over browser WebRTC. No question bank, code execution, Python service, websocket proxy, or worker deployment is used.
 
 ## Ownership and entry points
@@ -48,7 +50,7 @@ Realtime receives only the public approved question and voice-reader instruction
 
 All core research/interview tables have foreign keys, useful indexes and relevant checks. RLS is enabled on every table, with no anonymous/authenticated table policies or RPC grants. The service role accesses data exclusively from `server-only` modules. RPCs run with caller privileges and are restricted to `service_role`. Never send the service key to the browser.
 
-Only SHA-256 capability hashes are stored. All private responses are non-cacheable. The authorization abstraction can later validate Supabase Auth subjects instead of capabilities without making tables public. No raw audio or full-paper documents are persisted; transcripts, metadata, original summaries and evidence excerpts are persisted.
+Only SHA-256 capability hashes are stored. All private responses are non-cacheable. The authorization abstraction now validates Supabase Google users and session ownership in addition to the interview capability, without making tables public. No raw audio or full-paper documents are persisted; transcripts, metadata, original summaries and evidence excerpts are persisted.
 
 Sessions expire after 24 hours immediately for access purposes. Explicit DELETE cascades through questions, answers, evaluations and reports. Expired rows are deleted when the protected monthly research route invokes `cleanup_expired`, or when an administrator runs that RPC. This is **not** deletion precisely at 24 hours; a deployed/working cron is required for eventual cleanup, and hard failures before cleanup can delay it. Provider retention is separate from app deletion.
 

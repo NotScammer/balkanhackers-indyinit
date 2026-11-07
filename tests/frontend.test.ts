@@ -11,10 +11,8 @@ import {
   highlightParts,
   remainingSeconds,
 } from "../src/lib/client/interview-model";
-import {
-  safeReturnPath,
-  accountPreview,
-} from "../src/lib/client/account-preview";
+import { safeReturnPath } from "../src/lib/auth-paths";
+import { clearInterviewStorage } from "../src/lib/client/account";
 import { fixtureQuestions } from "../src/mocks/interview";
 import { recordingMime } from "../src/hooks/useRecorder";
 import type { Session, AnswerResult } from "../src/lib/client/contracts";
@@ -25,17 +23,11 @@ Object.defineProperty(globalThis, "sessionStorage", {
     setItem: (k: string, v: string) => store.set(k, v),
   },
 });
-test("account previews never authenticate and return destinations stay local", async () => {
-  accountPreview.continueAsGuest();
-  assert.equal(store.get("rehearsal:entry"), "guest");
-  assert.match(
-    (await accountPreview.requestEmailLink("demo@example.com")).message,
-    /No email was sent/,
-  );
-  await assert.rejects(() => accountPreview.requestEmailLink("invalid"));
+test("OAuth return destinations stay local", () => {
   assert.equal(safeReturnPath("//evil.test"), "/");
+  assert.equal(safeReturnPath("https://evil.test"), "/");
+  assert.equal(safeReturnPath("/auth/callback"), "/");
   assert.equal(safeReturnPath("/results/opaque-id"), "/results/opaque-id");
-  assert.equal([...store.values()].includes("demo@example.com"), false);
 });
 test("evidence highlighting preserves exact text and merges overlaps", () => {
   const text = "I measured latency and measured latency again.";
@@ -116,4 +108,11 @@ test("recording format detection handles absent or unsupported MediaRecorder", (
       value: original,
     });
   }
+});
+
+test("sign-out clears interview secrets and drafts while preserving theme and unrelated data", () => {
+  const values = new Map([['token:real:s','secret'], ['draft:s:q','private answer'], ['live-pending:s','pending answer'], ['rehearsal:theme','light'], ['unrelated','keep']]);
+  const storage = { get length() { return values.size; }, key: (i: number) => [...values.keys()][i] ?? null, removeItem: (key: string) => { values.delete(key); } } as Storage;
+  clearInterviewStorage(storage);
+  assert.deepEqual([...values], [['rehearsal:theme','light'], ['unrelated','keep']]);
 });

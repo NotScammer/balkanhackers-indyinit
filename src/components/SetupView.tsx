@@ -328,7 +328,7 @@ export default function SetupView() {
           Practice inspired by company context. No company endorsement or actual
           interview questions.
         </span>
-        <Link href="/login">Guest · Preview an account</Link>
+        <Link href="/login">Your account</Link>
       </div>
     </div>
   );

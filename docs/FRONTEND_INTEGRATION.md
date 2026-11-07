@@ -4,6 +4,8 @@ The integrated real frontend uses `/sessions/:id/live` and `/sessions/:id/live/t
 
 # Frontend integration contract
 
+**OAuth update:** Google sign-in is required for creation and all private routes, including audio/live endpoints. Keep the existing interview Bearer token and send the signed-in owner's Supabase cookie with same-origin requests. Creation derives ownership from the verified account. See [OAuth setup](OAUTH_SETUP.md); this supersedes the anonymous access rules below. The catalog stays public; cron uses its separate secret.
+
 Developer A owns pages, components, styles, microphone UI and WebRTC. Developer B owns the API and shared contracts. Import **types only** from `src/shared/contracts.ts` in browser code; runtime request schemas are in `src/shared/schemas.ts`. Coordinate changes to either shared file. See [setup](SETUP.md) for credentials/migrations and [architecture](BACKEND_ARCHITECTURE.md) for backend details.
 
 ## Changes from the original README
@@ -35,9 +37,11 @@ Every private response is `Cache-Control: no-store, private`. Never store tokens
 
 ## Catalog and session creation
 
+Browser requests automatically use the HttpOnly Auth cookies. For CLI examples, `cookies.txt` must contain a valid signed-in owner's cookie jar obtained through the browser OAuth flow; a session token alone is insufficient.
+
 ```sh
 curl http://localhost:3000/api/v1/catalog
-curl -X POST http://localhost:3000/api/v1/sessions \
+curl --cookie cookies.txt -X POST http://localhost:3000/api/v1/sessions \
   -H 'Content-Type: application/json' \
   -d '{"companyId":"google","roleId":"software-engineer","round":"mixed","difficulty":"intermediate","audioProcessingConsent":false}'
 ```
@@ -98,10 +102,10 @@ After refreshing, read the token from sessionStorage and GET the session. Its re
 
 ```sh
 # SESSION_ID and SESSION_TOKEN are copied into local shell variables without logging them.
-curl -H "Authorization: Bearer $SESSION_TOKEN" \
+curl --cookie cookies.txt -H "Authorization: Bearer $SESSION_TOKEN" \
   "http://localhost:3000/api/v1/sessions/$SESSION_ID"
 
-curl -X POST -H "Authorization: Bearer $SESSION_TOKEN" \
+curl --cookie cookies.txt -X POST -H "Authorization: Bearer $SESSION_TOKEN" \
   -H 'Content-Type: application/json' \
   "http://localhost:3000/api/v1/sessions/$SESSION_ID/turns/complete" \
   -d '{"clientAnswerId":"6ef81925-8250-4502-b4f4-2d69c63a0180","questionId":"1eb020b3-60ad-4cf9-aa25-6cf83832e170","transcript":"I compared the proposed approaches with a small experiment and shared the results with my teammate.","inputMode":"text","durationSeconds":null}'
@@ -156,6 +160,7 @@ async function api<T>(path: string, token?: string, payload?: unknown, method?: 
   const response = await fetch(`/api/v1${path}`, {
     method: method ?? (payload === undefined ? 'GET' : 'POST'),
     cache: 'no-store',
+    credentials: 'same-origin',
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(payload !== undefined ? { 'Content-Type': 'application/json' } : {}),
@@ -191,11 +196,11 @@ if (saved.reportAvailable) {
 ## Reports, end and delete
 
 ```sh
-curl -H "Authorization: Bearer $SESSION_TOKEN" \
+curl --cookie cookies.txt -H "Authorization: Bearer $SESSION_TOKEN" \
   "http://localhost:3000/api/v1/sessions/$SESSION_ID/report"
-curl -X POST -H "Authorization: Bearer $SESSION_TOKEN" \
+curl --cookie cookies.txt -X POST -H "Authorization: Bearer $SESSION_TOKEN" \
   "http://localhost:3000/api/v1/sessions/$SESSION_ID/end"
-curl -X DELETE -H "Authorization: Bearer $SESSION_TOKEN" \
+curl --cookie cookies.txt -X DELETE -H "Authorization: Bearer $SESSION_TOKEN" \
   "http://localhost:3000/api/v1/sessions/$SESSION_ID"
 ```
 

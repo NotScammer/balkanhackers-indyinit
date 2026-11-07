@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ThemeToggle from "./ThemeToggle";
+import AccountMenu from "./AccountMenu";
 export default function AppShell({
   children,
   practice = "Interview practice",
@@ -22,16 +23,7 @@ export default function AppShell({
           <span className="status-dot" />
           {practice}
         </span>
-        <Link
-          href={
-            returnTo
-              ? `/login?returnTo=${encodeURIComponent(returnTo)}`
-              : "/login"
-          }
-          className="account-link"
-        >
-          Guest · Account preview
-        </Link>
+        <AccountMenu returnTo={returnTo} />
       </header>
       <div className="shell">
         <section className="panel" aria-label="Practice workspace">

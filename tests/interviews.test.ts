@@ -1,3 +1,4 @@
+import { testUser } from './identity';
 import { beforeAll, afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -45,7 +46,7 @@ afterAll(async () => { await db?.sql.close(); });
 beforeEach(async () => {
   serial = 0; ai = mockAI();
   await db.sql.exec('delete from interview_sessions; delete from rate_buckets;');
-  api = createApi({ db, ai: () => ({ model: ai.model, generate: async <T>(schema: z.ZodType<T>, instruction: string, data: unknown, signal?: AbortSignal): Promise<T> => schema.parse(await ai.generate(schema, instruction, data, signal)) }), dataMode: 'illustrative', rateSalt: 'test-only', dailyLimit: 100, realtime: async () => ({ clientSecret: 'temporary-test-credential' }) });
+  api = createApi({ authenticate: async () => testUser, db, ai: () => ({ model: ai.model, generate: async <T>(schema: z.ZodType<T>, instruction: string, data: unknown, signal?: AbortSignal): Promise<T> => schema.parse(await ai.generate(schema, instruction, data, signal)) }), dataMode: 'illustrative', rateSalt: 'test-only', dailyLimit: 100, realtime: async () => ({ clientSecret: 'temporary-test-credential' }) });
 });
 
 describe('scoring and validation', () => {
