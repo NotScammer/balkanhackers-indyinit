@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ThemeToggle from "./ThemeToggle";
 export default function AppShell({
   children,
   practice = "Interview practice",
@@ -40,6 +41,7 @@ export default function AppShell({
       <footer>
         <span>Voice interview practice.</span>
         <span>No coding questions. No company endorsement.</span>
+        <ThemeToggle />
       </footer>
     </main>
   );

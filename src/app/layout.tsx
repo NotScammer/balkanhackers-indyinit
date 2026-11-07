@@ -7,7 +7,14 @@ export const metadata: Metadata = {
 };
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{document.documentElement.dataset.theme=localStorage.getItem("rehearsal:theme")==="light"?"light":"dark"}catch{}`,
+          }}
+        />
+      </head>
       <body>{children}</body>
     </html>
   );
