@@ -27,7 +27,7 @@ Object.defineProperty(globalThis, "sessionStorage", {
 });
 test("account previews never authenticate and return destinations stay local", async () => {
   accountPreview.continueAsGuest();
-  assert.equal(store.get("rehearsal:entry"), "guest");
+  assert.equal(store.get("talk-to-future:entry"), "guest");
   assert.match(
     (await accountPreview.requestEmailLink("demo@example.com")).message,
     /No email was sent/,

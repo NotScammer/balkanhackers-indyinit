@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, tokenKey } from "../lib/client/api";
@@ -11,6 +11,7 @@ import {
   type CompanyGroup,
 } from "../shared/company-guides";
 import FutureRoadmaps from "./FutureRoadmaps";
+import FutureHero from "./FutureHero";
 
 const interviewOrder: InterviewMode[] = [
   "behavioral",
@@ -55,7 +56,7 @@ export default function SetupView() {
         let selected: Setup = { ...first, audioProcessingConsent: false };
         try {
           const saved = JSON.parse(
-            sessionStorage.getItem("rehearsal:setup") ?? "null",
+            sessionStorage.getItem("talk-to-future:setup") ?? "null",
           );
           if (
             saved &&
@@ -90,7 +91,7 @@ export default function SetupView() {
   useEffect(() => {
     if (setup) {
       try {
-        sessionStorage.setItem("rehearsal:setup", JSON.stringify(setup));
+        sessionStorage.setItem("talk-to-future:setup", JSON.stringify(setup));
       } catch {}
     }
   }, [setup]);
@@ -159,43 +160,20 @@ export default function SetupView() {
 
   return (
     <div className="company-browser">
-      <section className="company-browser-intro">
-        <span className="tag">
-          <span className="status-dot" /> A little preparation. A lot more
-          possibility.
-        </span>
-        <h1>
-          Know the process.
-          <br />
-          <em>Prepare for what’s next.</em>
-        </h1>
-        <p>
-          Explore how companies have interviewed. Build the skills they could
-          ask for tomorrow.
-        </p>
-        <nav
-          className="explore-navigation"
-          aria-label="Explore interview preparation"
-        >
-          <a className="active" href="#company-history">
-            Company interview history <span aria-hidden="true">↓</span>
-          </a>
-          <a href="#future-roadmaps">
-            Future research roadmaps <span aria-hidden="true">↗</span>
-          </a>
-        </nav>
-      </section>
+      <FutureHero />
 
       <section
         id="company-history"
         className="history-section"
         aria-labelledby="history-heading"
       >
-        <div className="company-browser-heading">
+        <div className="company-browser-heading" data-reveal>
           <div>
             <p className="eyebrow">01 / THE INTERVIEW PLAYBOOK</p>
             <h2 id="history-heading">
-              Different companies. Different journeys.
+              Find your kind
+              <br />
+              of <em>company.</em>
             </h2>
           </div>
           <span className="section-label">
@@ -236,7 +214,7 @@ export default function SetupView() {
           .map((group) => (
             <section
               className="company-category"
-              key={group.id}
+              key={`${filter}-${group.id}`}
               aria-labelledby={`group-${group.id}`}
             >
               <div className="category-heading">
@@ -257,6 +235,12 @@ export default function SetupView() {
                     return (
                       <article
                         className={`company-group company-color-${index % 6} ${selected ? "has-selection" : ""}`}
+                        data-reveal
+                        style={
+                          {
+                            "--reveal-delay": `${(index % 3) * 65}ms`,
+                          } as CSSProperties
+                        }
                         key={company.id}
                         aria-labelledby={`company-${company.id}`}
                       >
@@ -355,15 +339,17 @@ export default function SetupView() {
       </section>
 
       <section
+        id="practice-setup"
         className="selection-checkout"
+        data-reveal
         ref={checkout}
         tabIndex={-1}
         aria-labelledby="practice-heading"
       >
-        <div className="selection-summary">
-          <p className="eyebrow">TURN PREPARATION INTO PRACTICE</p>
+        <div className="selection-summary" key={setup?.companyId}>
+          <p className="eyebrow">YOUR AMBITION. YOUR VOICE.</p>
           <h2 id="practice-heading">
-            {selectedCompany?.name ?? "Your next rehearsal"}
+            {selectedCompany?.name ?? "Your next Talk To Future interview"}
           </h2>
           <p>
             {selectedRole?.name ?? "Choose a company to begin"} · 3 main
@@ -374,6 +360,12 @@ export default function SetupView() {
             on spoken reasoning; historical coding assessments are shown for
             context.
           </p>
+          <div className="practice-doodle" aria-hidden="true">
+            <svg viewBox="0 0 240 90" fill="none">
+              <path d="M7 68c51-66 79-35 88-13 12 30-35 15-17-8 35-44 87-28 134-5m-17-21 20 21-24 13" />
+            </svg>
+            <span>You’ve got this.</span>
+          </div>
         </div>
         <div className="selection-start">
           {setup && catalog ? (

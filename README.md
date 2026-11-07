@@ -1,4 +1,4 @@
-# AI Interview Simulator
+# Talk To Future
 
 > **Backend update:** The implemented dynamic, research-grounded backend contract supersedes conflicting older MVP sections below. See [Backend architecture](docs/BACKEND_ARCHITECTURE.md), [Frontend integration](docs/FRONTEND_INTEGRATION.md), and [setup/migrations/deployment](docs/SETUP.md). Feedback stays private until completion; submit answers to `/api/v1/sessions/:sessionId/turns/complete`.
 

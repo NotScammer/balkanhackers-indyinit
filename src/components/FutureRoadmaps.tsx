@@ -1,4 +1,5 @@
 import { researchRoadmaps } from "../shared/research-roadmaps";
+import type { CSSProperties } from "react";
 
 export default function FutureRoadmaps() {
   return (
@@ -7,10 +8,14 @@ export default function FutureRoadmaps() {
       className="future-section"
       aria-labelledby="future-heading"
     >
-      <div className="company-browser-heading">
+      <div className="company-browser-heading" data-reveal>
         <div>
           <p className="eyebrow">02 / BEYOND THE USUAL QUESTIONS</p>
-          <h2 id="future-heading">Prepare for what they could ask next.</h2>
+          <h2 id="future-heading">
+            A little ahead
+            <br />
+            of <em>the curve.</em>
+          </h2>
         </div>
         <span className="research-label">
           <span aria-hidden="true">✧</span> Research outlook
@@ -22,8 +27,13 @@ export default function FutureRoadmaps() {
         historical interview reports or validated predictions.
       </p>
       <div className="roadmap-grid">
-        {researchRoadmaps.map((roadmap) => (
-          <article className="roadmap-card" key={roadmap.id}>
+        {researchRoadmaps.map((roadmap, index) => (
+          <article
+            className="roadmap-card"
+            key={roadmap.id}
+            data-reveal
+            style={{ "--reveal-delay": `${index * 80}ms` } as CSSProperties}
+          >
             <div className="roadmap-topline">
               <span>{roadmap.number} / RESEARCH ROADMAP</span>
               <span aria-hidden="true">↗</span>

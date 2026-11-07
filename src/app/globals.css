@@ -552,7 +552,7 @@ footer {
   margin: 6px 10px 6px 0;
 }
 
-/* Rehearsal: a calm, conversational workspace. */
+/* Talk To Future: a calm, conversational workspace. */
 :root {
   --wash: #0e1119;
   --paper: #171c28;
@@ -581,6 +581,7 @@ header {
   gap: 12px;
   font-size: 23px;
   letter-spacing: -0.9px;
+  white-space: nowrap;
 }
 .brand .brand-mark {
   display: grid;
@@ -593,6 +594,7 @@ header {
   font-size: 26px;
   font-weight: 750;
   padding-bottom: 4px;
+  flex-shrink: 0;
 }
 .practice-name {
   display: flex;
@@ -1022,6 +1024,18 @@ footer {
   }
   header {
     min-height: 82px;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 16px 0;
+  }
+  .brand {
+    gap: 9px;
+    font-size: 20px;
+  }
+  .brand .brand-mark {
+    width: 32px;
+    height: 32px;
+    font-size: 23px;
   }
   .shell {
     margin: 28px auto 40px;

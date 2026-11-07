@@ -1,23 +1,23 @@
 "use client";
 import { useSyncExternalStore } from "react";
-const key = "rehearsal:theme";
+const key = "talk-to-future:theme";
 function subscribe(listener: () => void) {
   const sync = (event: StorageEvent) => {
     if (event.key !== key && event.key !== null) return;
     document.documentElement.dataset.theme =
-      event.newValue === "light" ? "light" : "dark";
+      event.newValue === "dark" ? "dark" : "light";
     listener();
   };
   window.addEventListener("storage", sync);
-  window.addEventListener("rehearsal-theme", listener);
+  window.addEventListener("talk-to-future-theme", listener);
   return () => {
     window.removeEventListener("storage", sync);
-    window.removeEventListener("rehearsal-theme", listener);
+    window.removeEventListener("talk-to-future-theme", listener);
   };
 }
 const snapshot = () => document.documentElement.dataset.theme === "light";
 export default function ThemeToggle() {
-  const light = useSyncExternalStore(subscribe, snapshot, () => false);
+  const light = useSyncExternalStore(subscribe, snapshot, () => true);
   function toggle() {
     const theme = light ? "dark" : "light";
     document.documentElement.dataset.theme = theme;
@@ -26,7 +26,7 @@ export default function ThemeToggle() {
     } catch {
       /* Theme still works when storage is unavailable. */
     }
-    window.dispatchEvent(new Event("rehearsal-theme"));
+    window.dispatchEvent(new Event("talk-to-future-theme"));
   }
   return (
     <button

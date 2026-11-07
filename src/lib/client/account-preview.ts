@@ -1,7 +1,7 @@
 // Account previews never create an authenticated identity or store an email.
 export const accountPreview = {
   continueAsGuest() {
-    sessionStorage.setItem("rehearsal:entry", "guest");
+    sessionStorage.setItem("talk-to-future:entry", "guest");
   },
   async requestEmailLink(email: string) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
