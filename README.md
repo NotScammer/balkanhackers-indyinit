@@ -1,5 +1,7 @@
 # AI Interview Simulator
 
+> **Backend update:** The implemented dynamic, research-grounded backend contract supersedes conflicting older MVP sections below. See [Backend architecture](docs/BACKEND_ARCHITECTURE.md), [Frontend integration](docs/FRONTEND_INTEGRATION.md), and [setup/migrations/deployment](docs/SETUP.md). Feedback stays private until completion; submit answers to `/api/v1/sessions/:sessionId/turns/complete`.
+
 A hackathon project that helps candidates practice role-specific interviews, speak with an AI interviewer about technical and behavioral topics, and receive actionable feedback. System design is supported; coding questions are excluded.
 
 This README is the shared implementation specification for two developers and their coding assistants, including Codex and Claude Code. It describes the intended build; it does not claim that any feature is already implemented.
