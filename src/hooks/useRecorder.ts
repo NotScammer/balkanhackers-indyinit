@@ -63,7 +63,7 @@ export function useRecorder() {
       r.generation++;
       r.opening = false;
       setStage("idle");
-      setError("Microphone request cancelled. You can type instead.");
+      setError("Microphone request cancelled. Please retry the microphone.");
     }
     if (r.recorder?.state === "recording") r.recorder.stop();
   }, []);
@@ -81,11 +81,11 @@ export function useRecorder() {
         const mime = recordingMime();
         if (!mime || !navigator.mediaDevices?.getUserMedia)
           throw Error(
-            "Recording is unavailable in this browser. You can type your answer.",
+            "Recording is unavailable in this browser. Try another browser with recording support.",
           );
         if (limit <= 0)
           throw Error(
-            "You have used the recording time for this question. You can still type.",
+            "You have used the recording time for this question. You can restart the interview to try again.",
           );
         const stream = await acquireMicrophone(
           () => navigator.mediaDevices.getUserMedia({ audio: true }),
@@ -139,7 +139,7 @@ export function useRecorder() {
           setStage("reviewing recording");
           if (b.size > 25 * 1024 * 1024)
             setError(
-              "This recording exceeds 25 MB. Discard it and record less, or type your answer.",
+              "This recording exceeds 25 MB. Discard it and record less, or retry the recording.",
             );
         };
         recorder.onerror = () => {
@@ -149,7 +149,7 @@ export function useRecorder() {
           if (!r.dead) {
             discard();
             setError(
-              "The microphone stopped working. Try again or type your answer.",
+              "The microphone stopped working. Try again or retry the recording.",
             );
           }
         };
@@ -173,18 +173,20 @@ export function useRecorder() {
           }
           if (used >= limit && recorder.state === "recording") recorder.stop();
         }, 100);
+        return true;
       } catch (e) {
         if (r.generation === generation) release();
         if (!r.dead && r.generation === generation) {
           setStage("idle");
           setError(
             e instanceof DOMException && e.name === "NotAllowedError"
-              ? "Microphone permission was declined. You can type instead."
+              ? "Microphone permission was declined. Please retry the microphone."
               : e instanceof Error
                 ? e.message
-                : "Could not open the microphone. You can type instead.",
+                : "Could not open the microphone. Please retry the microphone.",
           );
         }
+        return false;
       } finally {
         if (r.generation === generation) r.opening = false;
       }

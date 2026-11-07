@@ -1,10 +1,11 @@
 :root {
-  --ink: #33352f;
-  --muted: #686b60;
-  --green: #45634e;
-  --line: #d9d7cb;
-  --paper: #fffdf6;
-  --wash: #f3f0e7;
+  color-scheme: dark;
+  --ink: #f0f1f2;
+  --muted: #a4a7ad;
+  --green: #e5e7eb;
+  --line: #35383e;
+  --paper: #191b1f;
+  --wash: #191b1f;
 }
 * {
   box-sizing: border-box;
@@ -14,40 +15,38 @@ body {
   background: var(--wash);
   color: var(--ink);
   font:
-    16px/1.65 system-ui,
+    15px/1.6 system-ui,
     -apple-system,
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
 }
 main {
-  max-width: 1150px;
+  max-width: 1120px;
   margin: auto;
   padding: 0 32px;
 }
 a {
-  color: var(--green);
+  color: inherit;
   text-underline-offset: 4px;
 }
 header {
   display: flex;
   align-items: center;
   gap: 24px;
-  min-height: 94px;
+  min-height: 90px;
   border-bottom: 1px solid var(--line);
-  font-size: 13px;
+  font-size: 12px;
 }
 .brand {
   color: var(--ink);
-  font:
-    600 22px/1.3 Georgia,
-    serif;
+  font-size: 18px;
+  font-weight: 600;
   text-decoration: none;
+  letter-spacing: -0.5px;
 }
 .brand span {
-  display: block;
-  font: 12px/1.8 system-ui;
-  color: var(--muted);
+  display: none;
 }
 .practice-name {
   margin: auto;
@@ -55,35 +54,38 @@ header {
 }
 .account-link {
   margin-left: auto;
+  color: var(--muted);
+  text-decoration: none;
 }
 .shell {
-  max-width: 760px;
-  margin: 48px auto 70px;
+  max-width: 820px;
+  margin: 30px auto 64px;
 }
 .panel {
-  padding: 36px 44px;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 3px;
+  padding: 12px 24px;
+  background: transparent;
+  border: 0;
 }
 h1 {
-  font:
-    normal 34px/1.25 Georgia,
-    serif;
-  margin: 12px 0 18px;
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: -0.7px;
+  margin: 16px 0 24px;
 }
 h2 {
-  font:
-    normal 27px/1.4 Georgia,
-    serif;
-  margin: 20px 0 14px;
+  font-size: 21px;
+  font-weight: 500;
+  line-height: 1.4;
+  margin: 24px 0 12px;
 }
 h3 {
-  font-size: 18px;
+  font-size: 16px;
+  font-weight: 600;
   margin: 24px 0 8px;
 }
 h4 {
-  font-size: 15px;
+  font-size: 14px;
   margin: 20px 0 6px;
 }
 p {
@@ -91,33 +93,33 @@ p {
 }
 .eyebrow,
 .fine {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted);
   letter-spacing: 0;
   text-transform: none;
 }
 .fixture {
-  font-size: 12px;
-  color: #6a5c36;
-  border-bottom: 1px solid #e2dac2;
-  padding-bottom: 14px;
-  margin: 0 0 28px;
+  font-size: 11px;
+  color: #a6a8af;
+  margin: 0 0 20px;
+  text-align: center;
 }
 .notice,
 .privacy {
-  background: #f1f1e8;
-  padding: 14px 18px;
-  border-left: 3px solid #9aab91;
+  background: #23262b;
+  padding: 16px;
+  border-radius: 8px;
 }
 .privacy {
-  font-size: 13px;
+  font-size: 12px;
   margin: 24px 0;
 }
 .error {
-  border-left: 3px solid #b45b43;
-  background: #faeee7;
+  border: 1px solid #744942;
+  background: #302321;
   padding: 14px 18px;
-  color: #7c382a;
+  color: #f5c4ba;
+  border-radius: 8px;
   margin: 18px 0;
 }
 button,
@@ -129,64 +131,58 @@ textarea {
 }
 button {
   cursor: pointer;
-  border: 1px solid #b9bdb0;
-  border-radius: 4px;
+  border: 1px solid #4b4e56;
+  border-radius: 7px;
   background: transparent;
   padding: 10px 16px;
   line-height: 1.4;
   margin: 6px 8px 6px 0;
 }
 button:hover:not(:disabled) {
-  background: #eaece1;
+  background: #303339;
 }
 button:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 .primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 20px;
-  background: var(--green);
-  color: white;
+  gap: 16px;
+  background: #e6e8eb;
+  color: #17191d;
   padding: 12px 22px;
-  border: 1px solid var(--green);
-  border-radius: 4px;
+  border: 1px solid #e6e8eb;
+  border-radius: 7px;
   text-decoration: none;
   margin: 18px 8px 12px 0;
-  font-weight: 500;
+  font-weight: 600;
 }
 button.primary:hover:not(:disabled) {
-  background: #354e3e;
+  background: #fff;
 }
 label {
   display: block;
-  font-size: 14px;
+  font-size: 13px;
 }
 input:not([type="checkbox"]):not([type="radio"]),
-select,
-textarea {
+select {
   display: block;
   width: 100%;
-  border: 1px solid #bcc0b2;
-  border-radius: 3px;
-  background: #fffefa;
+  border: 1px solid #4c5058;
+  border-radius: 6px;
+  background: #25282e;
   padding: 11px;
   margin: 7px 0 18px;
 }
-textarea {
-  min-height: 150px;
-  resize: vertical;
-  line-height: 1.7;
-}
 input[type="checkbox"],
 input[type="radio"] {
-  accent-color: var(--green);
+  accent-color: #b7c8df;
 }
 :focus-visible {
-  outline: 2px solid var(--green);
-  outline-offset: 4px;
+  outline: 2px solid #b7c8df;
+  outline-offset: 5px;
 }
 .selects {
   display: grid;
@@ -200,7 +196,7 @@ fieldset {
   margin: 20px 0;
 }
 legend {
-  font-size: 14px;
+  font-size: 13px;
   margin-bottom: 10px;
 }
 .modegrid {
@@ -219,20 +215,20 @@ legend {
 }
 .modecard strong {
   display: block;
-  font-weight: 600;
+  font-weight: 500;
 }
 .modecard span {
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.6;
   display: block;
   color: var(--muted);
   padding-right: 18px;
 }
 .modecard.selected strong {
-  color: var(--green);
+  color: #fff;
 }
 .modecard:has(input:disabled) {
-  opacity: 0.5;
+  opacity: 0.4;
 }
 .check {
   display: flex;
@@ -244,70 +240,115 @@ legend {
 .check input {
   margin-top: 5px;
 }
-.tabs {
+.voice-stage {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin: 20px 0;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 40px 12px 28px;
+  min-height: 430px;
 }
-.tabs [aria-pressed="true"] {
-  background: #e6ebdd;
-  border-color: var(--green);
+.question-heading {
+  font-size: clamp(23px, 3.2vw, 34px);
+  font-weight: 450;
+  line-height: 1.4;
+  max-width: 740px;
+  margin: 24px 0 12px;
 }
-.recordbox {
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  padding: 18px 0;
-  margin: 16px 0;
-}
-.recordbox p {
+.voice-prompt {
+  color: var(--muted);
   font-size: 14px;
+  min-height: 24px;
 }
-progress,
-meter {
-  width: 100%;
-  accent-color: var(--green);
-  height: 8px;
+.listen-button {
+  border: 0;
+  color: #c2c5cb;
+  font-size: 12px;
+  padding: 6px 12px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
-meter {
-  height: 18px;
+.voice-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 30px 0 18px;
+  gap: 12px;
+  min-height: 130px;
 }
-.statusline {
-  font-size: 13px;
-  color: var(--green);
-  min-height: 25px;
-}
-.scoreline {
+.mic-button {
+  border-radius: 50%;
+  width: 84px;
+  height: 84px;
+  background: #e9ebee;
+  color: #181b20;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  border: 0;
+  margin: 0;
 }
-.scoreline strong {
-  font-size: 24px;
+.mic-button:hover:not(:disabled) {
+  background: white;
 }
-.scoreline small {
-  font-size: 13px;
+.mic-button.is-recording {
+  background: #ba5c50;
+  color: white;
+}
+.voice-controls > span {
+  font-size: 12px;
   color: var(--muted);
+}
+.voice-level {
+  width: 160px;
+  font-size: 11px;
+  color: var(--muted);
+}
+meter {
+  width: 100%;
+  height: 16px;
+  accent-color: #acbbd1;
+}
+.statusline {
+  text-align: center;
+  font-size: 12px;
+  color: #b7c8df;
+  min-height: 25px;
+}
+.audio-review,
+.transcript-review {
+  border-top: 1px solid var(--line);
+  padding: 20px 0;
+  margin: 15px 0;
+}
+.audio-review h2 {
+  font-size: 16px;
+  margin-top: 0;
+}
+.audio-review audio {
+  width: 100%;
+  max-width: 100%;
+  height: 42px;
+}
+.send-answer {
+  display: flex;
+  margin: 24px auto;
 }
 .metrics {
   display: flex;
   flex-wrap: wrap;
   gap: 18px;
-  font-size: 13px;
+  font-size: 12px;
   text-transform: capitalize;
   padding: 12px 0;
 }
-.metrics b {
-  padding-left: 6px;
-}
 .bigscore {
-  font:
-    normal 54px Georgia,
-    serif;
+  font-size: 48px;
+  font-weight: 400;
   margin: 20px 0;
 }
 .bigscore span {
-  font: 16px system-ui;
+  font-size: 16px;
   color: var(--muted);
   margin-left: 10px;
 }
@@ -315,7 +356,7 @@ details {
   border-top: 1px solid var(--line);
   padding: 14px 0;
   margin: 12px 0;
-  font-size: 14px;
+  font-size: 13px;
 }
 summary {
   cursor: pointer;
@@ -324,20 +365,23 @@ summary {
 blockquote {
   margin: 16px 0;
   padding: 6px 16px;
-  border-left: 2px solid #9aab91;
+  border-left: 2px solid #68788e;
   overflow-wrap: anywhere;
 }
 blockquote p {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted);
 }
 .transcript {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  font-size: 14px;
+  line-height: 1.8;
+  color: #d2d5dc;
 }
 mark {
-  background: #e5ebcd;
-  color: inherit;
+  background: #3c4d66;
+  color: #fff;
 }
 ul,
 ol {
@@ -348,32 +392,18 @@ li {
 }
 .sessionactions {
   border-top: 1px solid var(--line);
-  margin-top: 30px;
+  margin-top: 32px;
   padding-top: 18px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
   gap: 16px;
-  font-size: 13px;
+  font-size: 12px;
+  color: var(--muted);
 }
 .sessionactions button {
-  font-size: 13px;
-}
-.question-heading {
-  font-size: 28px;
-}
-.interviewer {
-  font-size: 13px;
-  color: var(--muted);
-  margin-top: 24px;
-}
-.recording-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  background: #a44b3b;
-  border-radius: 50%;
-  margin-right: 7px;
+  font-size: 12px;
 }
 .actions {
   display: flex;
@@ -382,23 +412,18 @@ li {
   gap: 8px;
 }
 .dialogue {
-  border-left: 2px solid #a4af99;
-  padding-left: 18px;
-  margin: 24px 0;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  margin: 20px 0;
 }
-.dialogue textarea {
-  min-height: 100px;
+.dialogue h3 {
+  font-size: 16px;
 }
-.answer-preview {
-  background: #f4f3e9;
-  padding: 16px;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+.dialogue p {
+  font-size: 13px;
 }
-audio {
-  max-width: 100%;
-  display: block;
-  margin: 12px 0;
+.dialogue button {
+  font-size: 12px;
 }
 hr {
   border: 0;
@@ -412,48 +437,55 @@ footer {
   border-top: 1px solid var(--line);
   padding: 22px 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
 }
 .welcome {
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 24px;
-  margin-bottom: 24px;
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+  margin-top: 20px;
 }
 @media (max-width: 650px) {
   main {
     padding: 0 16px;
   }
   header {
-    min-height: 80px;
+    min-height: 70px;
     gap: 12px;
   }
   .practice-name {
     display: none;
   }
   .account-link {
-    font-size: 12px;
+    font-size: 11px;
   }
   .shell {
-    margin: 24px auto 40px;
+    margin: 20px auto 32px;
   }
   .panel {
-    padding: 24px 20px;
+    padding: 8px 0;
   }
   .selects,
   .modegrid {
     grid-template-columns: 1fr;
   }
   h1 {
-    font-size: 30px;
+    font-size: 27px;
+  }
+  .voice-stage {
+    padding: 20px 0;
+    min-height: 410px;
   }
   .question-heading {
-    font-size: 24px;
+    font-size: 25px;
   }
   footer {
     display: block;
   }
   footer span {
     display: block;
+  }
+  .voice-prompt {
+    font-size: 13px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

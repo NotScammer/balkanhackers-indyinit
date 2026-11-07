@@ -5,7 +5,7 @@ import { AnswerFeedback } from "./FeedbackView";
 import { modes } from "../lib/client/interview-model";
 import { dialogueEnabled } from "../lib/client/dialogue";
 import { readDialogueDraft } from "./DialogueView";
-export default function NotebookHistory({
+export default function ConversationHistory({
   id,
   answers,
 }: {

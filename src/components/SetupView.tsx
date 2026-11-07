@@ -14,7 +14,6 @@ export default function SetupView() {
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [welcome, setWelcome] = useState(false),
-    [preference, setPreference] = useState("voice"),
     [supported, setSupported] = useState(false);
   useEffect(() => {
     let live = true;
@@ -24,9 +23,6 @@ export default function SetupView() {
         if (!live) return;
         setCatalog(c);
         setSupported(canRecord());
-        setPreference(
-          sessionStorage.getItem("rehearsal:preferred-input") ?? "voice",
-        );
         const first = c.availableInterviews[0];
         if (!first) {
           setError("No practice is available yet. Please try again later.");
@@ -64,15 +60,9 @@ export default function SetupView() {
   useEffect(() => {
     if (setup) sessionStorage.setItem("rehearsal:setup", JSON.stringify(setup));
   }, [setup]);
-  useEffect(() => {
-    if (setup) sessionStorage.setItem("rehearsal:preferred-input", preference);
-  }, [setup, preference]);
+
   if (!setup || !catalog)
-    return (
-      <p role={error ? "alert" : "status"}>
-        {error || "Opening your notebook…"}
-      </p>
-    );
+    return <p role={error ? "alert" : "status"}>{error || "Connecting…"}</p>;
   const available = catalog.availableInterviews.filter(
     (a) => a.companyId === setup.companyId && a.roleId === setup.roleId,
   );
@@ -82,6 +72,12 @@ export default function SetupView() {
   };
   async function begin() {
     if (busy) return;
+    if (!setup?.audioProcessingConsent || !canRecord()) {
+      setError(
+        "Allow audio processing and use a browser with microphone recording to start.",
+      );
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -91,12 +87,7 @@ export default function SetupView() {
         `consent:${s.sessionId}`,
         String(setup!.audioProcessingConsent),
       );
-      sessionStorage.setItem(
-        `input:${s.sessionId}`,
-        setup!.audioProcessingConsent && canRecord() && preference === "voice"
-          ? "voice"
-          : "text",
-      );
+      sessionStorage.setItem(`input:${s.sessionId}`, "voice");
       router.push(`/interview/${s.sessionId}`);
     } catch {
       setError(
@@ -108,11 +99,10 @@ export default function SetupView() {
   }
   return (
     <>
-      <p className="eyebrow">Your practice notebook</p>
-      <h1>Choose your practice</h1>
+      <p className="eyebrow">Voice interview</p>
+      <h1>Before we begin</h1>
       <p>
-        Three questions. A little time to think. A few useful notes for next
-        time.
+        Choose your interview. You’ll hear each question and answer out loud.
       </p>
       <div className="selects">
         <label>
@@ -214,45 +204,16 @@ export default function SetupView() {
           I consent to audio processing for transcription.
         </label>
         <p>
-          You can always type instead. Your microphone opens only when you
-          choose to use it.
+          This interview uses voice answers. Your microphone opens only when you
+          choose to speak.
         </p>
       </div>
-      <fieldset disabled={busy}>
-        <legend>How would you like to answer?</legend>
-        <label className="check">
-          <input
-            type="radio"
-            name="input-preference"
-            checked={
-              !setup.audioProcessingConsent ||
-              !supported ||
-              preference === "text"
-            }
-            onChange={() => setPreference("text")}
-          />
-          Type my answers
-        </label>
-        <label className="check">
-          <input
-            type="radio"
-            name="input-preference"
-            disabled={!setup.audioProcessingConsent || !supported}
-            checked={
-              setup.audioProcessingConsent &&
-              supported &&
-              preference === "voice"
-            }
-            onChange={() => setPreference("voice")}
-          />
-          Speak, then review the transcript
-        </label>
-        {!supported && (
-          <p className="fine">
-            Recording is unavailable in this browser. Typing is ready to use.
-          </p>
-        )}
-      </fieldset>
+      {!supported && (
+        <p role="alert" className="error">
+          Microphone recording is unavailable in this browser. Open this
+          interview in a supported browser to continue.
+        </p>
+      )}
       {!welcome ? (
         <button
           className="primary"
@@ -265,14 +226,13 @@ export default function SetupView() {
         <div className="welcome">
           <h2>Let’s take it one question at a time.</h2>
           <p>
-            I’ll show you a question, then give you room to answer. You’ll
-            review your words before anything is evaluated. Feedback stays on
-            screen until you’re ready to move on.
+            Listen to each question, then tap the microphone to answer. You can
+            listen back and confirm the transcript before receiving feedback.
           </p>
           <p>
             {setup.audioProcessingConsent
-              ? "You can speak or type."
-              : "You’ll start with typed answers. To record, enable audio consent above."}
+              ? "You’ll answer out loud. Re-record whenever you need to."
+              : "Allow audio processing above to start a voice interview."}
           </p>
           {setup.audioProcessingConsent && (
             <>
@@ -291,8 +251,8 @@ export default function SetupView() {
               {mic.stage === "opening microphone" && (
                 <>
                   <p role="status">
-                    Waiting for microphone permission. You can cancel and
-                    continue by typing.
+                    Waiting for microphone permission. You can cancel and retry
+                    when you’re ready.
                   </p>
                   <button onClick={() => mic.stop(true)}>
                     Cancel microphone request
@@ -312,6 +272,8 @@ export default function SetupView() {
             className="primary"
             disabled={
               busy ||
+              !setup.audioProcessingConsent ||
+              !supported ||
               mic.stage === "recording" ||
               mic.stage === "opening microphone"
             }

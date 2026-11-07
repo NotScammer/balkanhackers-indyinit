@@ -9,7 +9,9 @@ export async function acquireMicrophone(
   const source = getStream().then((stream) => {
     if (expired || !isCurrent()) {
       stream.getTracks().forEach((t) => t.stop());
-      throw Error("Microphone request was cancelled. You can type instead.");
+      throw Error(
+        "Microphone request was cancelled. Please retry the microphone.",
+      );
     }
     return stream;
   });
@@ -21,7 +23,7 @@ export async function acquireMicrophone(
           expired = true;
           reject(
             Error(
-              "The microphone request is still waiting. You can retry or type instead.",
+              "The microphone request is still waiting. You can retry or try another browser.",
             ),
           );
         }, timeoutMs);

@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import NotebookShell from "../../components/NotebookShell";
+import AppShell from "../../components/AppShell";
 import {
   accountPreview,
   safeReturnPath,
@@ -21,7 +21,7 @@ export default function Login() {
     );
   };
   return (
-    <NotebookShell practice="Welcome">
+    <AppShell practice="Welcome">
       <p className="eyebrow">A place to practice</p>
       <h1>Come as you are.</h1>
       <p>
@@ -70,6 +70,6 @@ export default function Login() {
       </form>
       {message && <p role="status">{message}</p>}
       {error && <p role="alert">{error}</p>}
-    </NotebookShell>
+    </AppShell>
   );
 }

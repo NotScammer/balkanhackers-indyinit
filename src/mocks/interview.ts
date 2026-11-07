@@ -198,7 +198,7 @@ export const mockApi: InterviewApi = {
   },
   async transcribe() {
     throw Error(
-      "Fixture mode has no transcription provider. Use a typed answer to continue.",
+      "Fixture mode has no transcription provider. Connect the real transcription API, then retry this recording.",
     );
   },
   async speech() {

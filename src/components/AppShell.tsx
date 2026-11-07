@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { isMock } from "../lib/client/api";
-export default function NotebookShell({
+export default function AppShell({
   children,
-  practice = "Your practice notebook",
+  practice = "Interview practice",
   returnTo,
 }: {
   children: React.ReactNode;
@@ -32,14 +32,15 @@ export default function NotebookShell({
           {isMock && (
             <p className="fixture">
               Practice demo · Questions and feedback are fixtures, not AI
-              assessment. Voice providers are not connected.
+              assessment. Questions use browser speech; answer transcription
+              requires the real API.
             </p>
           )}
           {children}
         </section>
       </div>
       <footer>
-        <span>Make a little room to practice.</span>
+        <span>Voice interview practice.</span>
         <span>No coding questions. No company endorsement.</span>
       </footer>
     </main>

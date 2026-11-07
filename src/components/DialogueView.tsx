@@ -65,6 +65,8 @@ export default function DialogueView({
   disabled,
   onChange,
   recordedResponse,
+  onRecordFollowup,
+  onListen,
 }: {
   id: string;
   question: Question;
@@ -72,6 +74,8 @@ export default function DialogueView({
   disabled: boolean;
   onChange: (value: DialogueSnapshot) => void;
   recordedResponse?: string;
+  onRecordFollowup: () => void;
+  onListen: (text: string) => void;
 }) {
   const [d, setD] = useState(() => readDialogueDraft(id, question.id)),
     [busy, setBusy] = useState(false),
@@ -103,7 +107,10 @@ export default function DialogueView({
       questionId: question.id,
       clientRequestId: crypto.randomUUID(),
       kind,
-      candidateText: kind === "clarification" ? d.clarification : base,
+      candidateText:
+        kind === "clarification"
+          ? "Please clarify what this question is asking."
+          : base,
     };
     setD((v) => ({ ...v, request }));
     try {
@@ -116,6 +123,7 @@ export default function DialogueView({
           interaction,
         ],
       }));
+      onListen(interaction.text);
       if (interaction.kind === "follow_up") {
         sessionStorage.setItem(`follow-up-used:${id}`, "true");
         setUsed(true);
@@ -147,20 +155,11 @@ export default function DialogueView({
       {!d.interactions.some((i) => i.kind === "clarification") && (
         <details>
           <summary>Ask about this question</summary>
-          <label>
-            What would you like clarified?
-            <textarea
-              maxLength={2000}
-              value={d.clarification}
-              disabled={disabled || busy || !!d.request}
-              onChange={(e) => setD({ ...d, clarification: e.target.value })}
-            />
-          </label>
+
           <button
             disabled={
               disabled ||
               busy ||
-              !d.clarification.trim() ||
               (!!d.request && d.request.kind !== "clarification")
             }
             onClick={() => void ask("clarification")}
@@ -177,6 +176,12 @@ export default function DialogueView({
           <section key={i.id}>
             <h3>A little clarification</h3>
             <p>{i.text}</p>
+            <button
+              disabled={disabled || busy}
+              onClick={() => onListen(i.text)}
+            >
+              Listen
+            </button>
           </section>
         ))}
       {!hasFollowup && !used && base.trim() && (
@@ -226,19 +231,11 @@ export default function DialogueView({
               </>
             ) : (
               <>
-                <label>
-                  Your follow-up answer
-                  <textarea
-                    maxLength={10000}
-                    value={d.response}
-                    disabled={disabled || busy}
-                    onChange={(e) => setD({ ...d, response: e.target.value })}
-                  />
-                </label>
-                <p className="fine">
-                  Type here, or select “Follow-up answer” in the recording
-                  controls above.
-                </p>
+                {d.response && <p className="transcript">{d.response}</p>}
+                <button disabled={disabled || busy} onClick={onRecordFollowup}>
+                  Record follow-up answer
+                </button>
+
                 <button
                   disabled={disabled || busy}
                   onClick={() => setD({ ...d, declined: true })}

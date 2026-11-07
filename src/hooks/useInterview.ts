@@ -10,7 +10,7 @@ import {
   draftKey,
   feedbackToRestore,
 } from "../lib/client/interview-state";
-import { canRecord } from "./useRecorder";
+
 import type { InterviewPhase } from "../lib/client/interview-model";
 import type { Submission } from "../lib/client/contracts";
 import type { DialogueSubmission } from "../lib/client/dialogue-contract";
@@ -62,13 +62,7 @@ export function useInterview(id: string, results: boolean) {
           const saved = session.currentTurn
             ? restoreDraft(id, session.currentTurn.question.id)
             : {};
-          const mode =
-            consent && canRecord()
-              ? (saved.mode ??
-                (sessionStorage.getItem(`input:${id}`) === "voice"
-                  ? "voice"
-                  : "text"))
-              : "text";
+          const mode = "voice" as const;
           const report =
             session.status === "completed" && !feedback
               ? await api.report(id)
@@ -110,8 +104,16 @@ export function useInterview(id: string, results: boolean) {
   useEffect(() => {
     if (question && !state.feedback) saveDraft(id, question.id, state);
   }, [id, question, state]);
-  const submit = async (extra?: Partial<DialogueSubmission>) => {
-    if (!question || !state.confirmed || !state.draft.trim()) return;
+  const submit = async (
+    extra?: Partial<DialogueSubmission>,
+    explicitConfirmation = false,
+  ) => {
+    if (
+      !question ||
+      !(state.confirmed || explicitConfirmation) ||
+      !state.draft.trim()
+    )
+      return;
     await run(
       "Preparing your feedback",
       async () => {
