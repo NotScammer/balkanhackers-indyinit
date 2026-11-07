@@ -237,7 +237,7 @@ export class LiveService {
       delete state.control;
       if (input.kind === "correct") await this.correct(state, snapshot, input);
       else if (input.kind === "control")
-        this.control(state, snapshot, input.action);
+        await this.control(state, snapshot, input.action);
       else {
         const continuedGroup = state.groups.find((g) =>
           g.answers.some((a) => a.questionId === input.questionId),
@@ -279,10 +279,10 @@ export class LiveService {
       throw error;
     }
   }
-  private control(
+  private async control(
     state: LiveState,
     snapshot: Snapshot,
-    action: "repeat" | "pause" | "finish",
+    action: "repeat" | "pause" | "finish" | "next_topic",
   ) {
     if (state.status !== "active") {
       if (action === "finish") return;
@@ -293,6 +293,7 @@ export class LiveService {
       );
     }
     const prompt = activePrompt(state);
+    if (action === "next_topic") { await this.advance(state, snapshot, false); return; }
     if (action === "finish") {
       state.finishedEarly = true;
       this.complete(state, snapshot);
@@ -342,6 +343,7 @@ export class LiveService {
       },
       transcript,
       role,
+      [group.question, ...group.followups].map(q => ({ question: q.question_text, answer: group.answers.filter(a => a.questionId === q.id).map(a => a.transcript).join("\n") })),
     );
   }
   private async respond(
@@ -359,7 +361,7 @@ export class LiveService {
     const s = snapshot.session;
     const command = spokenControl(input.transcript);
     if (command && command !== "handoff") {
-      this.control(state, snapshot, command);
+      await this.control(state, snapshot, command);
       return;
     }
     if (command === "handoff") {
@@ -419,10 +421,13 @@ export class LiveService {
           : reportRecap(report(state, snapshot));
       return;
     }
-    const followUp =
-      group.followups.length < 2 &&
-      evaluation.adaptiveNextAction.action === "follow_up" &&
-      evaluation.adaptiveNextAction.weaknesses.length > 0;
+    const followUp = group.followups.length < 3 && evaluation.adaptiveNextAction.action === "follow_up";
+    await this.advance(state, snapshot, followUp);
+  }
+  private async advance(state: LiveState, snapshot: Snapshot, followUp: boolean) {
+    const group = state.groups.at(-1)!;
+    const evaluation = group.evaluation;
+    const s = snapshot.session;
     const previous = state.groups.flatMap((g) => [g.question, ...g.followups]);
     if (!followUp && state.groups.length === 3) {
       this.complete(state, snapshot);
@@ -443,15 +448,18 @@ export class LiveService {
         round: s.interview_mode,
         difficulty: s.difficulty,
         audioProcessingConsent: true,
+        personalization: s.personalization ?? undefined,
       },
       previous,
       {
         kind,
         followUp,
         targetTopic: followUp ? group.question.topic : "",
-        weaknesses: followUp ? evaluation.adaptiveNextAction.weaknesses : [],
+        weaknesses: followUp ? evaluation?.adaptiveNextAction.weaknesses ?? [] : [],
+        purpose: evaluation?.adaptiveNextAction.purpose, target: evaluation?.adaptiveNextAction.target,
       },
       s.data_mode,
+      { history: state.groups.flatMap(g => [g.question, ...g.followups].map(q => ({ question: q.question_text, answer: g.answers.filter(a => a.questionId === q.id).map(a => a.transcript).join("\n") }))), remainingNeeds: evaluation?.missingConcepts },
     );
     const saved = row(next, s.id, previous.length);
     if (followUp) group.followups.push(saved);

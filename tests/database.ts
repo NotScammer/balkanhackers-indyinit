@@ -17,6 +17,7 @@ export class TestDatabase implements Database {
     await sql.exec(await readFile('supabase/migrations/202611070004_oauth_ownership.sql', 'utf8'));
     await beforeTopicTrends?.(sql);
     await sql.exec(await readFile('supabase/migrations/202611070005_topic_trends.sql', 'utf8'));
+    await sql.exec(await readFile('supabase/migrations/202611070006_personalization.sql', 'utf8'));
     return new TestDatabase(sql);
   }
   async rpc<T>(name: string, args: Record<string, unknown> = {}): Promise<T> {

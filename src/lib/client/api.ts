@@ -43,9 +43,11 @@ export async function request<T>(
   if (!response.ok) {
     let code = "REQUEST_FAILED",
       retryable = false;
+    let profileMessage = "";
     try {
       const data = await response.json();
       code = data.error?.code ?? code;
+      if (path.startsWith("/profile") && typeof data.error?.message === "string") profileMessage = data.error.message;
       retryable = data.error?.retryable === true;
     } catch {}
     if (response.status === 401 && typeof window !== 'undefined') {
@@ -60,7 +62,7 @@ export async function request<T>(
     throw new RequestError(
       code === "SESSION_UNAVAILABLE"
         ? "Session expired or unavailable. Start a new practice."
-        : `Request failed (${code}). Your draft is preserved.`,
+        : profileMessage || `Request failed (${code}). Your draft is preserved.`,
       code,
       retryable,
       delay || 0,

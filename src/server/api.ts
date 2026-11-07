@@ -1,3 +1,4 @@
+import { createProfileApi } from "./profiles";
 import 'server-only';
 import { createLiveApi } from './live/api';
 import { createSessionSchema, completeTurnSchema } from '@/shared/schemas';
@@ -24,6 +25,7 @@ export function createApi(deps: ApiDependencies) {
     if (!await db.rpc<boolean>('consume_rate', { p_key: key, p_limit: limit, p_seconds: seconds })) throw new AppError('RATE_LIMITED', 429, 'Request budget exceeded. Try again later.', true);
   }
   return {
+    profile: createProfileApi(deps),
     live: createLiveApi(deps),
     frontendGet: (request: Request, id: string) => handle(async () => {
       const state = await authorize(db, sessionId(id), request, deps.authenticate);
@@ -42,7 +44,7 @@ export function createApi(deps: ApiDependencies) {
     catalog: () => handle(async () => json(catalog)),
     create: (request: Request) => handle(async () => {
       const user = await (deps.authenticate ?? requireUser)(request);
-      const input = await body(request, createSessionSchema); validateCombination(input);
+      const input = await body(request, createSessionSchema, 524288); validateCombination(input);
       await rate('create:global', deps.dailyLimit, 86400);
       await rate(`create:user:${hashToken(deps.rateSalt + user.id)}`, 10, 3600);
       // Vercel overwrites x-vercel-forwarded-for. Untrusted forwarded headers are ignored elsewhere.

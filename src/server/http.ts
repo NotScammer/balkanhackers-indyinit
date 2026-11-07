@@ -18,7 +18,7 @@ export async function handle(run: () => Promise<Response>) {
     return response;
   }
 }
-export async function body<T>(request: Request, schema: z.ZodType<T>): Promise<T> {
+export async function body<T>(request: Request, schema: z.ZodType<T>, maxBytes = 65536): Promise<T> {
   if (!request.headers.get('content-type')?.includes('application/json')) throw new AppError('INVALID_REQUEST', 400, 'Use application/json.');
   const reader = request.body?.getReader();
   if (!reader) throw new AppError('INVALID_REQUEST', 400, 'JSON body required.');
@@ -26,7 +26,7 @@ export async function body<T>(request: Request, schema: z.ZodType<T>): Promise<T
   for (;;) {
     const { done, value } = await reader.read(); if (done) break;
     size += value.byteLength;
-    if (size > 65536) { await reader.cancel(); throw new AppError('PAYLOAD_TOO_LARGE', 413, 'Request exceeds 64 KiB.'); }
+    if (size > maxBytes) { await reader.cancel(); throw new AppError('PAYLOAD_TOO_LARGE', 413, 'Request body is too large.'); }
     chunks.push(value);
   }
   return schema.parse(JSON.parse(Buffer.concat(chunks).toString('utf8')));

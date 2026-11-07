@@ -1,4 +1,5 @@
 "use client";
+import PersonalizationForm from "./PersonalizationForm";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -47,7 +48,7 @@ export default function SetupView() {
       const saved = JSON.parse(sessionStorage.getItem(pendingKey) ?? "null");
       sessionStorage.removeItem(pendingKey);
       if (
-        saved?.audioProcessingConsent === true &&
+        saved &&
         catalog.availableInterviews.some(
           (option) =>
             option.companyId === saved.companyId &&
@@ -60,21 +61,21 @@ export default function SetupView() {
           roleId: saved.roleId,
           round: saved.round,
           audioProcessingConsent: true,
+          personalization: saved.personalization,
         };
         const timer = setTimeout(() => {
           setPending(next);
-          void begin(next);
+
         }, 0);
         return () => clearTimeout(timer);
       }
     } catch {}
     // Resume a deliberate selection once the catalog is ready after sign-in.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalog]);
 
   useEffect(() => {
     const dialog = consentDialog.current;
-    if (pending && !pending.audioProcessingConsent) {
+    if (pending) {
       if (!dialog?.open) dialog?.showModal();
     } else if (dialog?.open) dialog.close();
   }, [pending]);
@@ -103,7 +104,7 @@ export default function SetupView() {
     } catch {}
     const next: Setup = { ...choice, audioProcessingConsent: consent };
     setPending(next);
-    if (consent) void begin(next);
+
   }
 
   async function begin(selection: Setup) {
@@ -398,8 +399,7 @@ export default function SetupView() {
           retention may differ.
         </p>
         <p className="fine">
-          Sign in with Google if prompted. Your interview will continue
-          automatically.
+          Sign in with Google if prompted. Your selection will be restored after signing in.
         </p>
         {error && (
           <p className="error" role="alert">
@@ -410,19 +410,11 @@ export default function SetupView() {
           <button disabled={busy} onClick={() => setPending(null)}>
             Cancel
           </button>
-          <button
-            className="primary"
-            disabled={busy}
-            onClick={() => {
-              if (!pending) return;
-              try {
-                sessionStorage.setItem(consentKey, "true");
-              } catch {}
-              void begin({ ...pending, audioProcessingConsent: true });
-            }}
-          >
-            {busy ? "Starting interview…" : "Agree and start interview"}
-          </button>
+          {pending && <PersonalizationForm key={`${pending.companyId}:${pending.roleId}`} disabled={busy} onStart={(personalization) => {
+            sessionStorage.setItem(consentKey, "true");
+            void begin({ ...pending, personalization, audioProcessingConsent: true });
+          }} />}
+
         </div>
       </dialog>
       <div className="company-browser-footnote">

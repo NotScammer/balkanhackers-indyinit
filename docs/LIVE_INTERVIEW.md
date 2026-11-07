@@ -5,8 +5,8 @@
 ## Agreed behavior
 
 - Open microphone with natural turn detection, interruptible interviewer speech, mute, disconnect and end controls.
-- Three main questions. Each can have zero, one or two adaptive follow-ups in the same topic/kind; mixed mode always covers behavioral, technical and system design.
-- Spoken coaching and visible notes after every answer. Numeric scores are returned only with the completed report.
+- Three main questions. Each can have zero to three adaptive follow-ups in the same topic/kind; mixed mode always covers behavioral, technical and system design.
+- Coaching and numeric scores are returned only with the completed report.
 - Clarification explains wording, scope and assumptions without giving solutions or using an answer/follow-up slot.
 - Transcription advances automatically. Candidates can correct saved answer transcripts during or after the interview. Corrections reassess that main-question group without advancing the conversation.
 - Each main question and all its follow-up answers receive one combined evaluation. The final average contains three groups, regardless of the number of follow-ups.
@@ -57,3 +57,15 @@ Existing limits cover connection issuance and conversation requests. A session a
 Automated checks cover full mixed-mode progression with all six follow-ups, score privacy, combined reports, clarification, correction/rescoring, continuations, deduplication, provider failure, lease serialization, capability checks, expiry, anonymous access denial and deletion. Audio tests cover WebRTC setup, ordered transcription, interruption, muting, disconnect and late microphone cleanup.
 
 With real credentials, verify a complete spoken session, interruption during playback, a spoken clarification, deeper follow-ups, transcript correction, reconnect after network loss, mobile playback/microphone permissions, final grouped scores and deletion. Do not treat fixture tests as proof of live provider behavior.
+
+## Personalization
+
+Apply `202611070006_personalization.sql` before deploying this version. It adds owner-scoped candidate profiles and per-session context snapshots. Older sessions default to no personalization.
+
+After selecting an interview, candidates can upload a PDF/DOCX (4 MiB maximum), paste experience (30,000 characters), or skip personalization. Extraction returns a draft; the candidate edits and confirms it before saving. Raw files and extracted source text are not persisted by the app. Resume text is sent to Claude for structured extraction; provider retention is separate. The account retains only the confirmed summary until replacement or removal. Job descriptions are session-specific. Existing sessions keep their snapshots after profile edits/removal and can be deleted separately.
+
+Authenticated account endpoints: GET/PUT/DELETE `/api/v1/profile`; POST `/api/v1/profile/extract` accepts JSON `{text}` or multipart `file`, returns a draft, and does not save it. PUT accepts `{experience: string[], projects: string[], skills: string[], accomplishments: string[]}`. Session creation optionally accepts `personalization: {profile, jobDescription}`. No profile is silently attached when omitted.
+
+Main questions target 25 words (35 maximum); follow-ups allow 25 words maximum. Generation receives ordered answers and confirmed context. Adaptive purposes include ownership, decisions, trade-offs, outcomes, reasoning gaps, and strengths. Each topic has at most three follow-ups; sufficient evidence ends it sooner. Next topic uses the existing idempotent control request with `action: "next_topic"`, preserves recorded answers, and never invents skipped answers. It pauses input while settling pending speech; Resume continues audio.
+
+Release checks: apply the migration in staging, verify profile isolation/extraction/removal, complete personalized and generic live sessions, exercise Next topic with pending speech, reconnect/correction, and confirm feedback is only shown at completion. Operational telemetry must contain only request IDs, timing, status codes and counts; never log resume, profile, job-description or transcript content. Automated fixture checks do not prove hosted migration or live provider behavior.

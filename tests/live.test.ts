@@ -12,6 +12,9 @@ import { hashToken } from "../src/server/auth";
 import { realtimeConfig } from "../src/server/realtime";
 import type { LiveState } from "../src/server/live/service";
 let failNext = false;
+let exploreStrength = false;
+let moveOn = false;
+let generationContext: Record<string, unknown> = {};
 let db: TestDatabase;
 let api: ReturnType<typeof createApi>;
 let calls = 0;
@@ -25,6 +28,9 @@ const texts = [
   "Discuss compute utilization and batching strategies under variable demand.",
   "Design a reliable inference gateway with capacity limits and graceful recovery.",
   "Describe the storage and queueing components needed for asynchronous inference.",
+  "Which performance assumption would you validate first and why?",
+  "What failure would change your original approach most?",
+  "How would you measure adoption after releasing the service?",
   "Explain how observability would help detect and isolate failures in this architecture.",
 ];
 const ai: StructuredAI = {
@@ -79,13 +85,15 @@ const ai: StructuredAI = {
         reasoningGaps: [],
         misconceptions: [],
         adaptiveNextAction: {
-          action: "follow_up",
-          weaknesses: ["Verification"],
+          action: moveOn ? "new_topic" : "follow_up",
+          purpose: "explore_strength", target: "Measured latency",
+          weaknesses: exploreStrength ? [] : ["Verification"],
           reasoning: "Probe verification.",
           targetTopic: forecast.topic,
         },
       });
     }
+    generationContext = data;
     const kind = data.kind;
     const behavioral = kind === "behavioral";
     return schema.parse({
@@ -141,7 +149,7 @@ afterAll(async () => {
 beforeEach(async () => {
   failNext = false;
   calls = 0;
-  serial = 0;
+  serial = 0; exploreStrength = false; moveOn = false;
   await db.sql.exec(
     "delete from interview_sessions; delete from rate_buckets;",
   );
@@ -169,10 +177,10 @@ beforeEach(async () => {
   ).json();
 });
 describe("live interview persistence and progression", () => {
-  it("covers three main kinds with two extra follow-ups each, withholding all coaching and scores until completion", async () => {
+  it("covers three main kinds with three extra follow-ups each, withholding all coaching and scores until completion", async () => {
     const kinds: string[] = [];
     const ids: string[] = [];
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 12; i++) {
       kinds.push(view.currentQuestion!.kind);
       ids.push(view.currentQuestion!.id);
       const { response } = await utterance();
@@ -180,7 +188,7 @@ describe("live interview persistence and progression", () => {
       expect(view.messages.filter((m) => m.kind === "feedback")).toHaveLength(
         0,
       );
-      if (i < 8) {
+      if (i < 11) {
         expect(view.report).toBeNull();
         expect(JSON.stringify(view)).not.toContain(
           "You explained your reasoning.",
@@ -193,14 +201,17 @@ describe("live interview persistence and progression", () => {
         );
       }
     }
-    expect(new Set(ids).size).toBe(9);
+    expect(new Set(ids).size).toBe(12);
     expect(kinds).toEqual([
       "behavioral",
       "behavioral",
       "behavioral",
+      "behavioral",
       "technical",
       "technical",
       "technical",
+      "technical",
+      "system_design",
       "system_design",
       "system_design",
       "system_design",
@@ -217,7 +228,7 @@ describe("live interview persistence and progression", () => {
     expect(view.report!.answers).toHaveLength(3);
     expect(
       view.report!.answers.every(
-        (a) => a.transcript.split("\n\n").length === 3,
+        (a) => a.transcript.split("\n\n").length === 4,
       ),
     ).toBe(true);
     expect((await db.snapshot(session.sessionId))!.session.status).toBe(
@@ -251,7 +262,7 @@ describe("live interview persistence and progression", () => {
       view = await (
         await api.live.get(request(session.sessionToken), session.sessionId)
       ).json();
-      for (let i = 0; i < 9; i++) {
+      for (let i = 0; i < 12; i++) {
         expect(view.currentQuestion!.kind).toBe(round);
         expect((await utterance()).response.status).toBe(200);
       }
@@ -325,7 +336,7 @@ describe("live interview persistence and progression", () => {
     expect(restored).toEqual(view);
   });
   it("keeps completed reports correctable and updates the persisted report", async () => {
-    for (let i = 0; i < 9; i++) await utterance();
+    for (let i = 0; i < 12; i++) await utterance();
     const previousScore = view.report!.overallScore;
     const answer = view.messages.find(
       (m) => m.role === "candidate" && m.kind === "answer",
@@ -491,7 +502,7 @@ describe("conversation controls and end-only feedback", () => {
     expect(view.report).toBeNull();
   });
   it("finishes early with a persisted report averaged over answered groups only", async () => {
-    for (let i = 0; i < 3; i++) await utterance();
+    for (let i = 0; i < 4; i++) await utterance();
     expect(view.mainNumber).toBe(2);
     const { response, input, result } = await control("finish");
     expect(response.status).toBe(200);
@@ -674,4 +685,32 @@ describe("conversation controls and end-only feedback", () => {
       ).status,
     ).toBe(401);
   });
+});
+
+it("explores strengths with answer context even without weakness notes", async () => {
+ exploreStrength = true;
+ expect((await utterance("I measured p99 latency using a load generator.")).response.status).toBe(200);
+ expect(view.followUpNumber).toBe(1);
+ expect(generationContext.followUp).toMatchObject({purpose:"explore_strength",target:"Measured latency",weaknesses:[]});
+ expect(generationContext.context).toMatchObject({history:[{answer:"I measured p99 latency using a load generator."}]});
+});
+it("moves on when there is sufficient evidence", async () => {
+ moveOn = true;
+ await utterance();
+ expect(view.mainNumber).toBe(2);
+ expect(view.followUpNumber).toBe(0);
+});
+it("skips unanswered topics without inventing evidence and deduplicates next-topic controls", async () => {
+ const input = {kind:"control",action:"next_topic",clientRequestId:randomUUID(),revision:view.revision};
+ const response = await api.live.turn(request(session.sessionToken,input),session.sessionId);
+ expect(response.status).toBe(200); view = await response.json();
+ expect(view.mainNumber).toBe(2);
+ expect(view.messages.filter(m=>m.kind==="answer")).toHaveLength(0);
+ const retry = await api.live.turn(request(session.sessionToken,input),session.sessionId);
+ expect(await retry.json()).toEqual(view);
+ moveOn = true;
+ await utterance(); await utterance();
+ expect(view.status).toBe("completed");
+ expect(view.report?.answers).toHaveLength(2);
+ expect(view.report?.coverage).toMatchObject({answeredMainQuestions:2,finishedEarly:true});
 });

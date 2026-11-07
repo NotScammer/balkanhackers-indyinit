@@ -33,6 +33,9 @@ const roadmapTexts = [
   'Compare rollback policies when an external action cannot be reversed automatically.',
   'Plan a staged rollout with measurable acceptance criteria and explicit stop conditions.',
   'Investigate a sharp increase in operational cost while task completion remains stable.',
+  'Which external dependency would you isolate first during a partial outage?',
+  'What operational signal would trigger escalation to a human reviewer?',
+  'How would you verify recovery without duplicating an irreversible action?',
   'Bound the blast radius of a compromised downstream integration across customer accounts.',
 ];
 function mockAI() {
@@ -286,7 +289,7 @@ describe('roadmap interviews', () => {
     const response = await service.create(request(undefined, { companyId: roadmapCompanyId(roadmap.id), roleId: 'software-engineer', round: 'system_design', audioProcessingConsent: true }));
     const session = await response.json() as CreateSessionResponse;
     let view = await (await service.live.get(request(session.sessionToken), session.sessionId)).json();
-    for (let index = 0; index < 9; index++) {
+    for (let index = 0; index < 12; index++) {
       expect(view.currentQuestion.topic).toBe(roadmap.title);
       const turn = await service.live.turn(request(session.sessionToken, { kind: 'utterance', clientRequestId: randomUUID(), revision: view.revision, questionId: view.currentQuestion.id, transcript: 'I measured latency under load and verified the trade-offs.' }), session.sessionId);
       expect(turn.status).toBe(200);
@@ -296,7 +299,7 @@ describe('roadmap interviews', () => {
     expect(view.report.answers).toHaveLength(3);
     expect(view.report.answers.every((answer: { question: { topic: string } }) => answer.question.topic === roadmap.title)).toBe(true);
     const questions = provider.contexts.filter((data) => 'roadmap' in data);
-    expect(questions).toHaveLength(9);
+    expect(questions).toHaveLength(12);
     expect((questions[1] as { followUp: unknown }).followUp).toMatchObject({ parentQuestion: roadmapTexts[0], weaknesses: ['Failure modes'] });
   });
 

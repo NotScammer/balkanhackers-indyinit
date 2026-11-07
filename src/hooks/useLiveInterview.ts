@@ -98,7 +98,7 @@ export function useLiveInterview(id: string) {
     persist();
     void processQueue();
   }
-  function control(action: "repeat" | "pause" | "finish") {
+  function control(action: "repeat" | "pause" | "finish" | "next_topic") {
     if (!current.current) return;
     enqueue({
       kind: "control",
@@ -541,6 +541,11 @@ export function useLiveInterview(id: string) {
     saveCorrection,
     setEditing,
     setCorrection,
+    nextTopic: async () => {
+      const mainNumber = current.current?.mainNumber;
+      await pause(false);
+      if (await processQueue() && current.current?.mainNumber === mainNumber) control("next_topic");
+    },
     repeat: () => {
       buffer.flush();
       control("repeat");

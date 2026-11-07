@@ -1,3 +1,4 @@
+import { personalizationSchema } from "./personalization";
 import { z } from 'zod';
 
 export const interviewModeSchema = z.enum(['behavioral', 'technical', 'system_design', 'mixed']);
@@ -6,6 +7,7 @@ export const difficultySchema = z.enum(['beginner', 'intermediate', 'advanced'])
 export const createSessionSchema = z.object({
   companyId: z.string().min(1).max(60), roleId: z.string().min(1).max(60),
   round: interviewModeSchema, difficulty: difficultySchema.default('intermediate'),
+  personalization: personalizationSchema.optional(),
   audioProcessingConsent: z.boolean().default(false),
 }).strict();
 export const completeTurnSchema = z.object({
@@ -19,6 +21,7 @@ export const categoryScoresSchema = z.object({
 const notes = z.array(z.string().min(1).max(1000)).max(12);
 export const adaptiveDecisionSchema = z.object({
   action: z.enum(['follow_up', 'new_topic']), weaknesses: notes,
+  purpose: z.enum(['ownership', 'decision', 'trade_off', 'outcome', 'reasoning_gap', 'explore_strength']).optional(), target: z.string().max(1000).optional(),
   reasoning: z.string().min(1).max(2000), targetTopic: z.string().min(1).max(200),
 }).strict();
 export const generatedQuestionSchema = z.object({

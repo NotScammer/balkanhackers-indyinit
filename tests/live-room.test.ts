@@ -52,6 +52,7 @@ const defaults: ReturnType<typeof useLiveInterview> = {
   pause: async () => {},
   resume: async () => {},
   finish: async () => {},
+  nextTopic: async () => {},
   disconnect: () => {},
   playRecap: async () => {},
   deleteSession: async () => {},

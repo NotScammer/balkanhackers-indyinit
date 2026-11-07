@@ -1134,3 +1134,12 @@ html:has(.motion-experience[data-motion="paused"]) {
     transform: none !important;
   }
 }
+
+.interview-consent { max-height: 90vh; overflow-y: auto; }
+.personalization-form { width: 100%; text-align: left; }
+.personalization-form fieldset { border: 0; padding: 0; min-width: 0; }
+.personalization-form label { display: block; margin: 14px 0; }
+.personalization-form textarea { display: block; width: 100%; min-height: 80px; padding: 10px; border: 1px solid var(--line); border-radius: 6px; font: inherit; }
+.personalization-form input[type=file] { display: block; max-width: 100%; margin-top: 8px; }
+.personalization-form .profile-confirmation { display: flex; gap: 8px; align-items: flex-start; }
+.interview-consent > .consent-actions { flex-wrap: wrap; }

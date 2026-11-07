@@ -54,6 +54,7 @@ export interface Catalog {
   }[];
 }
 export interface Setup {
+  personalization?: import("../../shared/personalization").Personalization;
   companyId: string;
   roleId: string;
   round: InterviewMode;

@@ -1,7 +1,7 @@
 import type { InterviewMode, PrivateEvaluation, QuestionKind } from '@/shared/contracts';
 import type { QuestionRow } from '../storage/types';
 import { INTERVIEW } from '../config';
-export interface NextDecision { kind: QuestionKind; followUp: boolean; targetTopic: string; weaknesses: string[] }
+export interface NextDecision { kind: QuestionKind; followUp: boolean; targetTopic: string; weaknesses: string[]; purpose?: string; target?: string }
 const kinds: QuestionKind[] = ['behavioral', 'technical', 'system_design'];
 export function decideNext(mode: InterviewMode, questions: QuestionRow[], evaluation: PrivateEvaluation | null, totalTurns: number = INTERVIEW.turns): NextDecision {
   if (questions.length >= totalTurns) throw new Error('Question budget exhausted');

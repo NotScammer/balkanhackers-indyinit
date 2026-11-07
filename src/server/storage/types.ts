@@ -15,6 +15,7 @@ export interface QuestionRow {
   is_follow_up: boolean; parent_question_id: string | null;
 }
 export interface SessionRow {
+  personalization?: import("@/shared/personalization").Personalization | null;
   owner_id: string | null;
   id: string; company_id: string; role_id: string; interview_mode: CreateSessionRequest['round']; difficulty: CreateSessionRequest['difficulty'];
   status: 'active' | 'completed' | 'cancelled'; current_turn_index: number; total_turns: number; current_question_id: string | null;

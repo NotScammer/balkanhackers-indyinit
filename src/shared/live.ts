@@ -6,7 +6,7 @@ export const liveRequestSchema = z.discriminatedUnion("kind", [
       kind: z.literal("control"),
       clientRequestId: z.uuid(),
       revision: z.number().int().nonnegative(),
-      action: z.enum(["repeat", "pause", "finish"]),
+      action: z.enum(["repeat", "pause", "finish", "next_topic"]),
     })
     .strict(),
   z

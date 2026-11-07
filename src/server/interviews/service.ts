@@ -44,7 +44,7 @@ export class InterviewService {
       let next = saved.next_question_checkpoint;
       if (!done && !next) {
         const decision = decideNext(s.interview_mode, fresh.questions, saved.evaluation, s.total_turns);
-        next = await generateQuestion(this.db, this.ai, { companyId: s.company_id, roleId: s.role_id, round: s.interview_mode, difficulty: s.difficulty, audioProcessingConsent: s.audio_processing_consent }, fresh.questions, decision, s.data_mode);
+        next = await generateQuestion(this.db, this.ai, { companyId: s.company_id, roleId: s.role_id, round: s.interview_mode, difficulty: s.difficulty, audioProcessingConsent: s.audio_processing_consent, personalization: s.personalization ?? undefined }, fresh.questions, decision, s.data_mode);
         await this.db.rpc('checkpoint_answer', { p_answer_id: answer.id, p_lease: lease, p_next: next });
       }
       const response: CompleteTurnResponse = { sessionId: s.id, status: done ? 'completed' : 'active',

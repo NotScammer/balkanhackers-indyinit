@@ -184,6 +184,9 @@ export function InterviewRoom({
                 >
                   Repeat
                 </button>
+                <button disabled={busy || finishing || connecting || pending.length > 0} onClick={() => void room.nextTopic()}>
+                  Next topic
+                </button>
                 <button
                   className="finish-interview"
                   disabled={finishing || connecting}
