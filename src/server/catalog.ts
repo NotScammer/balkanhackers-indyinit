@@ -1,13 +1,7 @@
 import type { Catalog, CreateSessionRequest } from "@/shared/contracts";
 import { AppError } from "./errors";
-const companies = [
-  { id: "google", name: "Google" },
-  { id: "ziprecruiter", name: "ZipRecruiter" },
-  { id: "openai", name: "OpenAI" },
-  { id: "anthropic", name: "Anthropic" },
-  { id: "nvidia", name: "NVIDIA" },
-  { id: "microsoft", name: "Microsoft" },
-];
+import { companyGuides } from "@/shared/company-guides";
+const companies = companyGuides.map(({ id, name }) => ({ id, name }));
 const roles = [{ id: "software-engineer", name: "Software Engineer" }];
 const interviewModes = [
   "behavioral",

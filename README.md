@@ -1,4 +1,4 @@
-# AI Interview Simulator
+# Talk To Future
 
 **Rehearsal** is a hackathon interview-practice application built with Next.js, TypeScript, Supabase, Claude, and OpenAI Realtime. It generates original practice questions using saved industry and academic research, runs a live spoken interview, and produces feedback grounded in the candidate's transcript.
 

@@ -331,7 +331,7 @@ export default function LiveInterview({ id }: { id: string }) {
           <div className="room-topline">
             <span className="tag">
               <span className="status-dot" />
-              Your rehearsal room
+              Your Talk To Future room
             </span>
             <div
               className="question-progress"

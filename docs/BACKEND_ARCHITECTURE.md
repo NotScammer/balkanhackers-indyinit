@@ -72,7 +72,7 @@ AI groups normalized concepts and produces hypotheses with validated source refe
 
 `npm run seed` retrieves real metadata for two cited older papers and stores original preparation hypotheses, clearly described as older source-backed seeds rather than fresh trend discoveries. `npm run seed -- --illustrative` loads an unmistakably synthetic fixture with `example.invalid` provenance. Enable `RESEARCH_DATA_MODE=illustrative` intentionally to use it; verified mode cannot select it. Dynamic question/evaluation calls still use Claude in both modes. There is no production mock AI adapter or fabricated success after provider failure.
 
-Automated tests mock external providers while running the actual SQL migrations and state functions. They do not establish live Supabase connectivity, provider account model access, browser microphone behavior or actual Vercel scheduling. Apply migrations, configure keys and complete the deployment rehearsal in [SETUP.md](SETUP.md).
+Automated tests mock external providers while running the actual SQL migrations and state functions. They do not establish live Supabase connectivity, provider account model access, browser microphone behavior or actual Vercel scheduling. Apply migrations, configure keys and complete the deployment walkthrough in [SETUP.md](SETUP.md).
 
 ## Verified implementation references
 

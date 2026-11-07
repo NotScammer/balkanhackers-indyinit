@@ -111,7 +111,7 @@ npm run smoke # briefly serves the production build on localhost:3107
 
 Local verification passed: 110 tests (22 frontend and 88 backend), TypeScript checks, lint, production build and the production HTTP smoke test. The dependency audit reported zero vulnerabilities after a patched development dependency override.
 
-Tests use no paid APIs or external database. They execute migrations and verify auth, hashing, expiry, idempotency/concurrency, scoring, privacy, reports, state recovery, source parsing, evidence validation, forecasting and cron locks/policies. Model quality and browser audio still require an account-backed rehearsal.
+Tests use no paid APIs or external database. They execute migrations and verify auth, hashing, expiry, idempotency/concurrency, scoring, privacy, reports, state recovery, source parsing, evidence validation, forecasting and cron locks/policies. Model quality and browser audio still require a walkthrough with live accounts.
 
 ## Manual research trigger
 
@@ -138,10 +138,10 @@ Immediate access expiry is implemented. Eventual cleanup runs at the beginning o
 2. Set required variables in Vercel Project Settings → Environment Variables. Give Preview and Production the correct separate database/keys. Redeploy after environment changes.
 3. Enable **Fluid compute** and verify your plan supports `maxDuration=180` on interview handlers and `maxDuration=240` on research. The [current limits documentation](https://vercel.com/docs/functions/limitations) lists 300 seconds maximum on Hobby with Fluid compute; legacy non-Fluid Hobby is limited to 60 seconds. Actual project plan/runtime settings were not accessible here and must be verified in the dashboard. Lower the research deadline/budgets if your deployment is more constrained; do not assume a large monthly scan always fits.
 4. `vercel.json` declares exactly one monthly cron: first day of month at 09:00 UTC. Set `CRON_SECRET`; Vercel sends the corresponding Bearer header. Verify the production cron configuration and invocation logs after deployment. Preview deploys are for manual testing; do not assume scheduled production jobs run in previews.
-5. Keep deployment protection enabled during rehearsal. Configure provider spend limits and review privacy/consent copy before sharing with candidates.
+5. Keep deployment protection enabled during the walkthrough. Configure provider spend limits and review privacy/consent copy before sharing with candidates.
 6. Apply migrations and run the verified seed before the first interview. Deploying the app does neither.
 
-## Account-backed rehearsal remaining
+## Live-account walkthrough remaining
 
 - [ ] Apply/verify all four hosted migrations and server role grants.
 - [ ] Load actual metadata through the verified seed; confirm `dataMode: verified` in creation.
