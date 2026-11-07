@@ -196,6 +196,10 @@ describe('authorized durable three-turn flow', () => {
     expect((await api.realtime(request(consented.sessionToken), consented.sessionId)).status).toBe(200);
     const cfg = realtimeConfig((await db.snapshot(consented.sessionId))!, 'configured-model', 'configured-transcriber');
     expect(cfg.audio.input.turn_detection?.create_response).toBe(false);
+    expect(cfg.audio.input).toMatchObject({
+      noise_reduction: { type: 'near_field', strength: 1 },
+      turn_detection: { type: 'server_vad', threshold: 0.75, prefix_padding_ms: 300, silence_duration_ms: 1200, interrupt_response: true },
+    });
     expect(cfg.instructions).not.toContain('Assess the reasoning');
   });
   it('caps follow-up depth and preserves mixed coverage', async () => {

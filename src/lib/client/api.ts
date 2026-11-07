@@ -62,6 +62,8 @@ export async function request<T>(
     throw new RequestError(
       code === "SESSION_UNAVAILABLE"
         ? "Session expired or unavailable. Start a new practice."
+        : code === "AI_INVALID_OUTPUT"
+          ? "The interviewer couldn’t prepare a valid response. Your words are preserved. Retry saving, or retry finishing if you were ending the interview."
         : profileMessage || `Request failed (${code}). Your draft is preserved.`,
       code,
       retryable,

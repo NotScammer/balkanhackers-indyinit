@@ -216,7 +216,7 @@ export function InterviewRoom({
           {error && (
             <div role="alert" className="error">
               <p>{error}</p>
-              {connected && (
+              {connected && pending.length === 0 && !finishFailed && (
                 <button onClick={() => room.enablePlayback()}>
                   Enable audio playback
                 </button>

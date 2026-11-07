@@ -95,3 +95,12 @@ test("transcription uses multipart with questionId and detected audio format", a
     globalThis.fetch = original;
   }
 });
+
+ test("invalid AI responses explain how to recover without exposing provider details", async () => {
+  const original = globalThis.fetch;
+  values.set(tokenKey("id"), "token");
+  globalThis.fetch = async () => Response.json({ error: { code: "AI_INVALID_OUTPUT", message: "private details", retryable: true } }, { status: 502 });
+  try {
+    await assert.rejects(() => realApi.session("id"), (e: unknown) => e instanceof RequestError && e.retryable && e.message.includes("Retry saving") && !e.message.includes("private details"));
+  } finally { globalThis.fetch = original; }
+});

@@ -1,4 +1,14 @@
 import { acquireMicrophone } from "./media";
+// Keep quiet room sounds from being amplified into foreground speech. Use the
+// same processing when reconnecting a microphone after a pause.
+const microphoneConstraints: MediaStreamConstraints = {
+  audio: {
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: false,
+    channelCount: 1,
+  },
+};
 export interface LiveAudioCallbacks {
   questionId(): string | null;
   onTranscript(
@@ -47,13 +57,7 @@ export class LiveAudio {
       const stream = input
         ? await acquireMicrophone(
             () =>
-              navigator.mediaDevices.getUserMedia({
-                audio: {
-                  echoCancellation: true,
-                  noiseSuppression: true,
-                  autoGainControl: true,
-                },
-              }),
+              navigator.mediaDevices.getUserMedia(microphoneConstraints),
             current,
           )
         : null;
@@ -373,13 +377,7 @@ export class LiveAudio {
     const generation = this.generation;
     const stream = await acquireMicrophone(
       () =>
-        navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-          },
-        }),
+        navigator.mediaDevices.getUserMedia(microphoneConstraints),
       () => generation === this.generation,
     );
     if (generation !== this.generation) return;

@@ -145,6 +145,11 @@ it("reacquires a stopped microphone on resume without creating another peer or t
   await connection.settleInput();
   await connection.resumeInput();
   expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(2);
+  for (const [constraints] of vi.mocked(navigator.mediaDevices.getUserMedia).mock.calls) {
+    expect(constraints).toEqual({ audio: {
+      echoCancellation: true, noiseSuppression: true, autoGainControl: false, channelCount: 1,
+    } });
+  }
   expect(peer).toBe(originalPeer);
   expect(peer.sender.replaceTrack).toHaveBeenCalledWith(track);
   expect(fetch).toHaveBeenCalledTimes(1);
