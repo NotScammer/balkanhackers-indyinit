@@ -3,9 +3,11 @@ import { isMock } from "../lib/client/api";
 export default function NotebookShell({
   children,
   practice = "Your practice notebook",
+  returnTo,
 }: {
   children: React.ReactNode;
   practice?: string;
+  returnTo?: string;
 }) {
   return (
     <main>
@@ -14,7 +16,14 @@ export default function NotebookShell({
           Rehearsal<span>Interview practice</span>
         </Link>
         <span className="practice-name">{practice}</span>
-        <Link href="/login" className="account-link">
+        <Link
+          href={
+            returnTo
+              ? `/login?returnTo=${encodeURIComponent(returnTo)}`
+              : "/login"
+          }
+          className="account-link"
+        >
           Guest · Account preview
         </Link>
       </header>

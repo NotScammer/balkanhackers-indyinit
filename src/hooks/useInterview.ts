@@ -1,4 +1,5 @@
 "use client";
+import { rememberQuestion } from "../lib/client/interview-state";
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import { api, RequestError } from "../lib/client/api";
 import {
@@ -12,6 +13,7 @@ import {
 import { canRecord } from "./useRecorder";
 import type { InterviewPhase } from "../lib/client/interview-model";
 import type { Submission } from "../lib/client/contracts";
+import type { DialogueSubmission } from "../lib/client/dialogue-contract";
 export function useInterview(id: string, results: boolean) {
   const [state, dispatch] = useReducer(interviewReducer, initialInterview);
   const lock = useRef(false),
@@ -54,6 +56,7 @@ export function useInterview(id: string, results: boolean) {
         async () => {
           const session = await api.session(id);
           if (!live.current) return;
+          rememberQuestion(id, session.currentTurn?.question ?? null);
           const consent = sessionStorage.getItem(`consent:${id}`) === "true";
           const feedback = feedbackToRestore(session, results);
           const saved = session.currentTurn
@@ -107,7 +110,7 @@ export function useInterview(id: string, results: boolean) {
   useEffect(() => {
     if (question && !state.feedback) saveDraft(id, question.id, state);
   }, [id, question, state]);
-  const submit = async (extra?: Partial<Submission>) => {
+  const submit = async (extra?: Partial<DialogueSubmission>) => {
     if (!question || !state.confirmed || !state.draft.trim()) return;
     await run(
       "Preparing your feedback",
@@ -130,6 +133,7 @@ export function useInterview(id: string, results: boolean) {
         saveDraft(id, question.id, { ...state, pending: payload });
         const result = await api.submit(id, payload);
         if (!live.current) return;
+        rememberQuestion(id, result.nextTurn?.question ?? null);
         dispatch({ type: "answered", result });
         sessionStorage.removeItem(draftKey(id, question.id));
       },

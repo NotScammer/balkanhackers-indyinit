@@ -163,3 +163,16 @@ export function feedbackToRestore(
       }
     : null;
 }
+
+export function rememberQuestion(
+  id: string,
+  question: { id: string; text: string } | null,
+) {
+  if (!question) return;
+  let saved: Record<string, string> = {};
+  try {
+    saved = JSON.parse(sessionStorage.getItem(`question-cache:${id}`) ?? "{}");
+  } catch {}
+  saved[question.id] = question.text;
+  sessionStorage.setItem(`question-cache:${id}`, JSON.stringify(saved));
+}

@@ -1,11 +1,14 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, tokenKey } from "../lib/client/api";
 import { useInterview } from "../hooks/useInterview";
 import { useRecorder } from "../hooks/useRecorder";
 import { modes, remainingSeconds } from "../lib/client/interview-model";
 import NotebookShell from "./NotebookShell";
+import NotebookHistory from "./NotebookHistory";
 import SetupView from "./SetupView";
+import DialogueView, { type DialogueSnapshot } from "./DialogueView";
+import { dialogueEnabled } from "../lib/client/dialogue";
 import { AnswerFeedback, ReportView } from "./FeedbackView";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -47,6 +50,23 @@ function InterviewRoom({ id, results }: { id: string; results: boolean }) {
     heading = useRef<HTMLHeadingElement | null>(null),
     localAudio = useRef<HTMLAudioElement | null>(null);
   const [welcome, setWelcome] = useState(true);
+  const [dialogue, setDialogue] = useState<
+    (DialogueSnapshot & { questionId: string }) | null
+  >(null);
+  const [recordTarget, setRecordTarget] = useState("answer"),
+    [followupTranscript, setFollowupTranscript] = useState<
+      string | undefined
+    >();
+  const onDialogue = useCallback(
+    (value: DialogueSnapshot) => {
+      setDialogue({ ...value, questionId: q?.id ?? "" });
+      dispatch({ type: "confirm", value: false });
+    },
+    [q?.id, dispatch],
+  );
+  const activeDialogue = dialogue?.questionId === q?.id ? dialogue : null;
+  const fullTranscript = activeDialogue?.transcript ?? s.draft;
+  const dialogueValid = activeDialogue?.valid ?? true;
   const isRecording = mic.stage === "recording",
     audioBusy = isRecording || mic.stage === "opening microphone";
   const disabled = !!s.busy || audioBusy;
@@ -130,12 +150,16 @@ function InterviewRoom({ id, results }: { id: string; results: boolean }) {
         dispatch({
           type: "restore",
           value: {
-            draft: r.transcript,
+            ...(recordTarget === "followup" && activeDialogue?.hasFollowup
+              ? {}
+              : { draft: r.transcript }),
             duration: s.duration + mic.seconds,
             confirmed: false,
             phase: "reviewing transcript",
           },
         });
+        if (recordTarget === "followup" && activeDialogue?.hasFollowup)
+          setFollowupTranscript(r.transcript);
         setTranscribed(true);
         setRecordingReview(false);
       },
@@ -153,6 +177,9 @@ function InterviewRoom({ id, results }: { id: string; results: boolean }) {
     sessionStorage.setItem(`read:${id}`, String(s.session!.answers.length));
     stopPlayback();
     discardRecording();
+    setRecordTarget("answer");
+    setFollowupTranscript(undefined);
+    setDialogue(null);
     if (s.feedback.nextTurn) {
       dispatch({ type: "next" });
     } else router.push(`/results/${id}`);
@@ -169,6 +196,7 @@ function InterviewRoom({ id, results }: { id: string; results: boolean }) {
   }
   return (
     <NotebookShell
+      returnTo={`/${results ? "results" : "interview"}/${id}`}
       practice={
         s.session
           ? `${modes[s.session.round].title} practice`
@@ -276,6 +304,22 @@ function InterviewRoom({ id, results }: { id: string; results: boolean }) {
           )}
           {s.mode === "voice" && (
             <div className="recordbox">
+              {activeDialogue?.hasFollowup && (
+                <label>
+                  Record for
+                  <select
+                    value={recordTarget}
+                    disabled={disabled || !!s.pending}
+                    onChange={(e) => {
+                      discardRecording();
+                      setRecordTarget(e.target.value);
+                    }}
+                  >
+                    <option value="answer">Original answer</option>
+                    <option value="followup">Follow-up answer</option>
+                  </select>
+                </label>
+              )}
               <p>
                 {Math.ceil(remainingSeconds(q.maxAnswerSeconds, s.duration))}{" "}
                 seconds of recording available for this question.
@@ -294,7 +338,6 @@ function InterviewRoom({ id, results }: { id: string; results: boolean }) {
                     Stop recording
                   </button>
                   <button
-                    disabled={!isRecording}
                     onClick={() => {
                       mic.stop(true);
                       setRecordingReview(false);
@@ -374,11 +417,37 @@ function InterviewRoom({ id, results }: { id: string; results: boolean }) {
               ? "Your submitted answer is held unchanged for a safe retry."
               : "Your draft is saved in this tab."}
           </p>
+          <DialogueView
+            key={q.id}
+            id={id}
+            question={q}
+            base={s.draft}
+            disabled={disabled || !!s.pending || recordingReview}
+            onChange={onDialogue}
+            recordedResponse={followupTranscript}
+          />
+          {activeDialogue && activeDialogue.hasFollowup && (
+            <>
+              <h3>Your complete answer for review</h3>
+              <p className="answer-preview">{fullTranscript}</p>
+            </>
+          )}
+          {fullTranscript.length > 10000 && (
+            <p role="alert">
+              Your complete answer exceeds 10,000 characters. Please shorten it.
+            </p>
+          )}
           <label className="check">
             <input
               type="checkbox"
               checked={s.confirmed}
-              disabled={disabled || !s.draft.trim() || recordingReview}
+              disabled={
+                disabled ||
+                !s.draft.trim() ||
+                recordingReview ||
+                !dialogueValid ||
+                fullTranscript.length > 10000
+              }
               onChange={(e) =>
                 dispatch({ type: "confirm", value: e.target.checked })
               }
@@ -392,11 +461,22 @@ function InterviewRoom({ id, results }: { id: string; results: boolean }) {
               !s.confirmed ||
               !s.draft.trim() ||
               recordingReview ||
+              !dialogueValid ||
+              fullTranscript.length > 10000 ||
               (s.mode === "voice" && s.duration === 0)
             }
             onClick={() => {
               stopPlayback();
-              void submit();
+              localAudio.current?.pause();
+              void submit(
+                dialogueEnabled && activeDialogue?.context.length
+                  ? {
+                      transcript: fullTranscript,
+                      baseTranscript: s.draft,
+                      dialogueContext: activeDialogue.context,
+                    }
+                  : undefined,
+              );
             }}
           >
             {s.pending ? "Retry the same answer" : "Get feedback"}
@@ -415,19 +495,11 @@ function InterviewRoom({ id, results }: { id: string; results: boolean }) {
         <p>Opening your notebook…</p>
       ) : null}
       {s.session && s.session.answers.length > 0 && !s.report && (
-        <details>
-          <summary>
-            Your conversation so far · {s.session.answers.length} answered
-          </summary>
-          {s.session.answers.map((a, i) => (
-            <section key={a.answerId}>
-              <h3>
-                Question {i + 1} · {modes[a.evaluation.questionKind].title}
-              </h3>
-              <AnswerFeedback answer={a} />
-            </section>
-          ))}
-        </details>
+        <NotebookHistory
+          key={s.session.answers.length}
+          id={id}
+          answers={s.session.answers}
+        />
       )}
       {s.session && (
         <div className="sessionactions">

@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { acquireMicrophone } from "../lib/client/media";
 export type AudioStage =
   "idle" | "opening microphone" | "recording" | "reviewing recording";
 export function recordingMime() {
@@ -34,7 +35,8 @@ export function useRecorder() {
     dead: boolean;
     url?: string;
     opening: boolean;
-  }>({ cancel: false, dead: false, opening: false });
+    generation: number;
+  }>({ cancel: false, dead: false, opening: false, generation: 0 });
   const release = useCallback(() => {
     const r = resources.current;
     r.stream?.getTracks().forEach((t) => t.stop());
@@ -57,6 +59,12 @@ export function useRecorder() {
   const stop = useCallback((cancel = false) => {
     const r = resources.current;
     r.cancel = cancel;
+    if (r.opening) {
+      r.generation++;
+      r.opening = false;
+      setStage("idle");
+      setError("Microphone request cancelled. You can type instead.");
+    }
     if (r.recorder?.state === "recording") r.recorder.stop();
   }, []);
   const start = useCallback(
@@ -64,6 +72,7 @@ export function useRecorder() {
       const r = resources.current;
       if (r.opening || r.recorder?.state === "recording") return;
       r.opening = true;
+      const generation = ++r.generation;
       r.cancel = false;
       setError("");
       discard();
@@ -78,10 +87,11 @@ export function useRecorder() {
           throw Error(
             "You have used the recording time for this question. You can still type.",
           );
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-        });
-        if (r.dead) {
+        const stream = await acquireMicrophone(
+          () => navigator.mediaDevices.getUserMedia({ audio: true }),
+          () => !r.dead && r.generation === generation,
+        );
+        if (r.dead || r.generation !== generation) {
           stream.getTracks().forEach((t) => t.stop());
           return;
         }
@@ -91,7 +101,7 @@ export function useRecorder() {
         let analyser: AnalyserNode | undefined;
         try {
           r.context = new AudioContext();
-          await r.context.resume();
+          void r.context.resume().catch(() => {});
           analyser = r.context.createAnalyser();
           analyser.fftSize = 256;
           r.context.createMediaStreamSource(stream).connect(analyser);
@@ -164,8 +174,8 @@ export function useRecorder() {
           if (used >= limit && recorder.state === "recording") recorder.stop();
         }, 100);
       } catch (e) {
-        release();
-        if (!r.dead) {
+        if (r.generation === generation) release();
+        if (!r.dead && r.generation === generation) {
           setStage("idle");
           setError(
             e instanceof DOMException && e.name === "NotAllowedError"
@@ -176,7 +186,7 @@ export function useRecorder() {
           );
         }
       } finally {
-        r.opening = false;
+        if (r.generation === generation) r.opening = false;
       }
     },
     [discard, release],

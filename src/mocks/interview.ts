@@ -1,3 +1,5 @@
+import { validateFixtureDialogue } from "./dialogue";
+import type { DialogueSubmission } from "../lib/client/dialogue-contract";
 import type {
   AnswerResult,
   Catalog,
@@ -124,6 +126,8 @@ export const mockApi: InterviewApi = {
       throw Error("Question out of order. Reload session.");
     if (!a.transcript.trim() || a.transcript.length > 10000)
       throw Error("Enter 1–10,000 characters.");
+    if ("dialogueContext" in a)
+      validateFixtureDialogue(id, a as DialogueSubmission);
     const answer: AnswerResult = {
       answerId: crypto.randomUUID(),
       questionId: q.id,
@@ -205,5 +209,6 @@ export const mockApi: InterviewApi = {
   async delete(id) {
     read(id);
     sessionStorage.removeItem(key(id));
+    sessionStorage.removeItem(`dialogue-fixture:${id}`);
   },
 };

@@ -13,7 +13,9 @@ export default function SetupView() {
     [setup, setSetup] = useState<Setup | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
-    [welcome, setWelcome] = useState(false);
+    [welcome, setWelcome] = useState(false),
+    [preference, setPreference] = useState("voice"),
+    [supported, setSupported] = useState(false);
   useEffect(() => {
     let live = true;
     api
@@ -21,6 +23,10 @@ export default function SetupView() {
       .then((c) => {
         if (!live) return;
         setCatalog(c);
+        setSupported(canRecord());
+        setPreference(
+          sessionStorage.getItem("rehearsal:preferred-input") ?? "voice",
+        );
         const first = c.availableInterviews[0];
         if (!first) {
           setError("No practice is available yet. Please try again later.");
@@ -58,6 +64,9 @@ export default function SetupView() {
   useEffect(() => {
     if (setup) sessionStorage.setItem("rehearsal:setup", JSON.stringify(setup));
   }, [setup]);
+  useEffect(() => {
+    if (setup) sessionStorage.setItem("rehearsal:preferred-input", preference);
+  }, [setup, preference]);
   if (!setup || !catalog)
     return (
       <p role={error ? "alert" : "status"}>
@@ -84,7 +93,9 @@ export default function SetupView() {
       );
       sessionStorage.setItem(
         `input:${s.sessionId}`,
-        setup!.audioProcessingConsent && canRecord() ? "voice" : "text",
+        setup!.audioProcessingConsent && canRecord() && preference === "voice"
+          ? "voice"
+          : "text",
       );
       router.push(`/interview/${s.sessionId}`);
     } catch {
@@ -207,6 +218,41 @@ export default function SetupView() {
           choose to use it.
         </p>
       </div>
+      <fieldset disabled={busy}>
+        <legend>How would you like to answer?</legend>
+        <label className="check">
+          <input
+            type="radio"
+            name="input-preference"
+            checked={
+              !setup.audioProcessingConsent ||
+              !supported ||
+              preference === "text"
+            }
+            onChange={() => setPreference("text")}
+          />
+          Type my answers
+        </label>
+        <label className="check">
+          <input
+            type="radio"
+            name="input-preference"
+            disabled={!setup.audioProcessingConsent || !supported}
+            checked={
+              setup.audioProcessingConsent &&
+              supported &&
+              preference === "voice"
+            }
+            onChange={() => setPreference("voice")}
+          />
+          Speak, then review the transcript
+        </label>
+        {!supported && (
+          <p className="fine">
+            Recording is unavailable in this browser. Typing is ready to use.
+          </p>
+        )}
+      </fieldset>
       {!welcome ? (
         <button
           className="primary"
@@ -242,6 +288,17 @@ export default function SetupView() {
                   ? "Stop microphone check"
                   : "Check my microphone (5 seconds)"}
               </button>
+              {mic.stage === "opening microphone" && (
+                <>
+                  <p role="status">
+                    Waiting for microphone permission. You can cancel and
+                    continue by typing.
+                  </p>
+                  <button onClick={() => mic.stop(true)}>
+                    Cancel microphone request
+                  </button>
+                </>
+              )}
               {mic.stage === "recording" && (
                 <label>
                   Microphone level
