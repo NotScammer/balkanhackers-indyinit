@@ -1,12 +1,13 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, tokenKey } from "../lib/client/api";
-import type { Catalog, Setup } from "../lib/client/contracts";
+import type { Catalog, Setup, InterviewMode } from "../lib/client/contracts";
 import { modes } from "../lib/client/interview-model";
 export default function SetupView() {
   const router = useRouter();
+  const companiesRail = useRef<HTMLDivElement>(null);
   const [catalog, setCatalog] = useState<Catalog | null>(null),
     [setup, setSetup] = useState<Setup | null>(null),
     [error, setError] = useState(""),
@@ -63,9 +64,27 @@ export default function SetupView() {
 
   if (!setup || !catalog)
     return <p role={error ? "alert" : "status"}>{error || "Connecting…"}</p>;
-  const available = catalog.availableInterviews.filter(
-    (a) => a.companyId === setup.companyId && a.roleId === setup.roleId,
+  const companies = catalog.companies.filter((company) =>
+    catalog.availableInterviews.some(
+      (option) => option.companyId === company.id,
+    ),
   );
+  const selectedCompany = companies.find(
+    (company) => company.id === setup.companyId,
+  );
+  const selectedRole = catalog.roles.find((role) => role.id === setup.roleId);
+  const interviewOrder: InterviewMode[] = [
+    "technical",
+    "behavioral",
+    "system_design",
+    "mixed",
+  ];
+  const descriptions: Record<InterviewMode, string> = {
+    technical: "Concepts, reasoning & problem solving",
+    behavioral: "Your experience, decisions & impact",
+    system_design: "Architecture, scale & trade-offs",
+    mixed: "A little of every interview type",
+  };
   const change = (patch: Partial<Setup>) => {
     setSetup({ ...setup, ...patch });
   };
@@ -97,177 +116,220 @@ export default function SetupView() {
     }
   }
   return (
-    <div className="setup-layout">
-      <section className="setup-intro">
+    <div className="company-browser">
+      <section className="company-browser-intro">
         <span className="tag">
-          <span className="status-dot" /> A conversation, not a questionnaire
+          <span className="status-dot" /> Live conversations. Real confidence.
         </span>
         <h1>
-          A little practice.
+          Your next opportunity.
           <br />
-          <em>A lot more confidence.</em>
+          <em>Your kind of practice.</em>
         </h1>
-        <p className="intro-description">
-          Meet your AI interviewer. Think out loud, ask questions, and find your
-          rhythm before the real thing.
-        </p>
-        <div className="intro-voice" aria-hidden="true">
-          <span />
-          <span />
-          <span />
-          <span />
-          <span />
-          <span />
-          <span />
-        </div>
-        <div className="feature-list">
-          <p>
-            <b>01</b> Speak naturally. Interrupt anytime.
-          </p>
-          <p>
-            <b>02</b> Go deeper with thoughtful follow-ups.
-          </p>
-          <p>
-            <b>03</b> Leave with feedback you can use.
-          </p>
-        </div>
-        <p className="intro-footnote">
-          Your space to get better. One conversation at a time.
-        </p>
+        <p>Choose a company, pick an interview, and start talking.</p>
       </section>
-      <section className="setup-card" aria-label="Set up your interview">
-        <p className="eyebrow">YOUR NEXT REHEARSAL</p>
-        <h2>Make it your interview.</h2>
-        <p className="fine">
-          Pick a direction. We’ll take the conversation from there.
-        </p>
-        <div className="selects">
-          <label>
-            Company
-            <select
-              disabled={busy}
-              value={setup.companyId}
-              onChange={(e) => {
-                const a = catalog.availableInterviews.find(
-                  (a) => a.companyId === e.target.value,
-                )!;
-                change({
-                  companyId: a.companyId,
-                  roleId: a.roleId,
-                  round: a.round,
-                });
-              }}
-            >
-              {catalog.companies
-                .filter((c) =>
-                  catalog.availableInterviews.some((a) => a.companyId === c.id),
-                )
-                .map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <label>
-            Role
-            <select
-              disabled={busy}
-              value={setup.roleId}
-              onChange={(e) => {
-                const a = catalog.availableInterviews.find(
-                  (a) =>
-                    a.companyId === setup.companyId &&
-                    a.roleId === e.target.value,
-                )!;
-                change({ roleId: a.roleId, round: a.round });
-              }}
-            >
-              {catalog.roles
-                .filter((r) =>
-                  catalog.availableInterviews.some(
-                    (a) => a.companyId === setup.companyId && a.roleId === r.id,
-                  ),
-                )
-                .map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-            </select>
-          </label>
+      <div className="company-browser-heading">
+        <div>
+          <p className="eyebrow">FIND YOUR NEXT REHEARSAL</p>
+          <h2>Where do you want to go?</h2>
         </div>
-        <fieldset disabled={busy}>
-          <legend>What would you like to work on?</legend>
-          <div className="modegrid">
-            {Object.entries(modes).map(([key, v]) => (
-              <label
-                key={key}
-                className={`modecard ${setup.round === key ? "selected" : ""}`}
+        <div className="rail-navigation">
+          <span>Explore companies</span>
+          <button
+            aria-label="Scroll companies left"
+            onClick={() =>
+              companiesRail.current?.scrollBy({
+                left: -330,
+                behavior: "smooth",
+              })
+            }
+          >
+            ←
+          </button>
+          <button
+            aria-label="Scroll companies right"
+            onClick={() =>
+              companiesRail.current?.scrollBy({ left: 330, behavior: "smooth" })
+            }
+          >
+            →
+          </button>
+        </div>
+      </div>
+      <fieldset className="company-picker" disabled={busy}>
+        <legend className="visually-hidden">
+          Choose a company and interview type
+        </legend>
+        <div
+          className="company-rail"
+          ref={companiesRail}
+          tabIndex={0}
+          role="region"
+          aria-label="Company interview options. Scroll horizontally to explore."
+        >
+          {companies.map((company, index) => {
+            const choices = catalog.availableInterviews.filter(
+              (option) => option.companyId === company.id,
+            );
+            const roleIds = [
+              ...new Set(choices.map((option) => option.roleId)),
+            ];
+            const roleId = roleIds.includes(setup.roleId)
+              ? setup.roleId
+              : roleIds[0];
+            const role = catalog.roles.find(
+              (candidate) => candidate.id === roleId,
+            );
+            return (
+              <section
+                className={`company-group company-color-${index % 6} ${setup.companyId === company.id ? "has-selection" : ""}`}
+                aria-labelledby={`company-${company.id}`}
+                key={company.id}
               >
-                <input
-                  type="radio"
-                  name="round"
-                  checked={setup.round === key}
-                  disabled={!available.some((a) => a.round === key)}
-                  onChange={() => change({ round: key as Setup["round"] })}
-                />
-                <strong>{v.title}</strong>
-                <span>{v.description}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-        <p className="fine">
-          Three main questions, with up to two deeper follow-ups each. No coding
-          required.
-        </p>
-        <div className="privacy">
+                <div className="company-group-header">
+                  <span className="company-monogram" aria-hidden="true">
+                    {company.name === "ZipRecruiter"
+                      ? "Z"
+                      : company.name.slice(0, 1)}
+                  </span>
+                  <span className="company-count">
+                    {
+                      choices.filter((option) => option.roleId === roleId)
+                        .length
+                    }{" "}
+                    interviews
+                  </span>
+                </div>
+                <h3 id={`company-${company.id}`}>{company.name}</h3>
+                <p className="company-role">{role?.name}</p>
+                {roleIds.length > 1 && (
+                  <label className="company-role-select">
+                    Role
+                    <select
+                      value={roleId}
+                      onChange={(event) => {
+                        const choice = choices.find(
+                          (option) => option.roleId === event.target.value,
+                        )!;
+                        change({
+                          companyId: company.id,
+                          roleId: choice.roleId,
+                          round: choice.round,
+                        });
+                      }}
+                    >
+                      {roleIds.map((id) => (
+                        <option key={id} value={id}>
+                          {catalog.roles.find((role) => role.id === id)?.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                <div className="company-interviews">
+                  {interviewOrder
+                    .filter((round) =>
+                      choices.some(
+                        (option) =>
+                          option.roleId === roleId && option.round === round,
+                      ),
+                    )
+                    .map((round) => {
+                      const selected =
+                        setup.companyId === company.id &&
+                        setup.roleId === roleId &&
+                        setup.round === round;
+                      return (
+                        <label
+                          key={round}
+                          className={`company-interview ${selected ? "selected" : ""}`}
+                        >
+                          <input
+                            type="radio"
+                            name="company-interview"
+                            value={`${company.id}:${roleId}:${round}`}
+                            checked={selected}
+                            aria-label={`${company.name} ${modes[round].title}`}
+                            onChange={() =>
+                              change({ companyId: company.id, roleId, round })
+                            }
+                          />
+                          <span className="interview-copy">
+                            <strong>{modes[round].title}</strong>
+                            <small>{descriptions[round]}</small>
+                          </span>
+                          <span
+                            className="interview-indicator"
+                            aria-hidden="true"
+                          >
+                            {selected ? "✓" : "↗"}
+                          </span>
+                        </label>
+                      );
+                    })}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      </fieldset>
+      <section
+        className="selection-checkout"
+        aria-label="Your selected interview"
+      >
+        <div className="selection-summary" aria-live="polite">
+          <p className="eyebrow">YOUR REHEARSAL</p>
+          <h2>
+            {selectedCompany?.name} <span> / </span>
+            {modes[setup.round].title}
+          </h2>
+          <p>{selectedRole?.name} · 3 main questions · Adaptive follow-ups</p>
+        </div>
+        <div className="selection-start">
           <label className="check">
             <input
-              disabled={busy}
               type="checkbox"
+              disabled={busy}
               checked={setup.audioProcessingConsent}
-              onChange={(e) =>
-                change({ audioProcessingConsent: e.target.checked })
+              onChange={(event) =>
+                change({ audioProcessingConsent: event.target.checked })
               }
             />
             <span>
               I agree to live audio processing.
               <small>
-                Your microphone opens when you connect. Audio streams to OpenAI;
-                transcripts go to Claude for feedback and are saved with your
-                session. Provider retention may differ.
+                Audio streams to OpenAI. Transcripts go to Claude and are saved
+                with your session. Provider retention may differ.
               </small>
             </span>
           </label>
+          <button
+            className="primary start-button"
+            disabled={busy || !setup.audioProcessingConsent || !supported}
+            onClick={() => void begin()}
+          >
+            {busy ? "Preparing your interview…" : "Start this interview"}
+            <span aria-hidden="true">↗</span>
+          </button>
         </div>
-        {!supported && (
-          <p role="alert" className="error">
-            Live audio needs microphone access and a supported browser.
-          </p>
-        )}
-        <button
-          className="primary start-button"
-          disabled={busy || !setup.audioProcessingConsent || !supported}
-          onClick={() => void begin()}
-        >
-          {busy ? "Preparing your interview…" : "Let’s talk"}
-          <span aria-hidden="true">↗</span>
-        </button>
-        <p className="fine setup-promise">
-          Three main questions · Adaptive follow-ups · Feedback as you go
-        </p>
-        {error && (
-          <p role="alert" className="error">
-            {error}
-          </p>
-        )}
-        <p className="fine">
-          Practicing as a guest. <Link href="/login">Preview an account</Link>{" "}
-          if you’d like to see what’s coming.
-        </p>
       </section>
+      {!supported && (
+        <p role="alert" className="error">
+          Live audio needs microphone access and a supported browser.
+        </p>
+      )}
+      {error && (
+        <p role="alert" className="error">
+          {error}
+        </p>
+      )}
+      <div className="company-browser-footnote">
+        <span>
+          Practice inspired by company context. No company endorsement or actual
+          interview questions.
+        </span>
+        <Link href="/login">Guest · Preview an account</Link>
+      </div>
     </div>
   );
 }
