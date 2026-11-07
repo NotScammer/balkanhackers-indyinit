@@ -6,14 +6,14 @@
 
 The real API mode now uses natural live audio, spoken feedback, clarification and up to two extra follow-ups for each of three main questions. Scores appear only at the end, combining each main answer with its follow-ups. Transcripts advance automatically and remain correctable. See [live interview setup and architecture](docs/LIVE_INTERVIEW.md).
 
-Apply **all three** migrations, configure the database and model credentials, seed research, and build with `NEXT_PUBLIC_USE_MOCK_API=false`. Mock mode retains the older recorded-answer fixture preview. The recorded-upload endpoints below remain for compatibility; they are not the live conversation transport.
+Apply **all three** migrations, configure the database and model credentials, seed research, and rebuild. The interface always uses live conversation; the old recorded-answer screen has been removed. The recorded-upload endpoints below remain for compatibility; they are not the live conversation transport.
 
 ## Integrated app: deployment
 
 Both branches are integrated into one Next.js website. The voice interface uses the same-origin backend for questions, recordings, per-turn feedback, refresh recovery and final reports.
 
 1. Use Node.js 22.12+ and run `npm ci`.
-2. Copy `.env.example` to `.env.local`. Configure Supabase, Claude and OpenAI keys/models, plus `RATE_LIMIT_SALT`. Set `NEXT_PUBLIC_USE_MOCK_API=false` before building.
+2. Copy `.env.example` to `.env.local`. Configure Supabase, Claude and OpenAI keys/models, plus `RATE_LIMIT_SALT`.
 3. Apply all three SQL migrations and seed forecasts using [docs/SETUP.md](docs/SETUP.md). Question generation requires seeded research.
 4. Run `npm test`, `npm run lint`, `npm run typecheck`, and `npm run build`.
 5. Run `npm start`, or deploy the repository as a Next.js project on Vercel with the same environment settings. Configure the database and seed before opening access.

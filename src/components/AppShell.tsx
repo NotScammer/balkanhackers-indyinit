@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { isMock } from "../lib/client/api";
 export default function AppShell({
   children,
   practice = "Interview practice",
@@ -13,9 +12,15 @@ export default function AppShell({
     <main>
       <header>
         <Link className="brand" href="/">
-          Rehearsal<span>Interview practice</span>
+          <span className="brand-mark" aria-hidden="true">
+            r.
+          </span>
+          Rehearsal
         </Link>
-        <span className="practice-name">{practice}</span>
+        <span className="practice-name">
+          <span className="status-dot" />
+          {practice}
+        </span>
         <Link
           href={
             returnTo
@@ -29,13 +34,6 @@ export default function AppShell({
       </header>
       <div className="shell">
         <section className="panel" aria-label="Practice workspace">
-          {isMock && (
-            <p className="fixture">
-              Practice demo · Questions and feedback are fixtures, not AI
-              assessment. Questions use browser speech; answer transcription
-              requires the real API.
-            </p>
-          )}
           {children}
         </section>
       </div>

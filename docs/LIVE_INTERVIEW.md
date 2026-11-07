@@ -13,7 +13,7 @@
 
 1. Apply the existing two migrations, then `supabase/migrations/202611070003_live_conversation.sql`. Supabase CLI users can run `supabase db push` against their selected project.
 2. Configure `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RATE_LIMIT_SALT`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `OPENAI_API_KEY`, `OPENAI_REALTIME_MODEL` and `OPENAI_TRANSCRIPTION_MODEL` using `.env.example`. Model IDs must be supported by the configured accounts. `OPENAI_TTS_MODEL` is used by the older recorded-audio routes, not this live flow.
-3. Seed research using the instructions in SETUP.md. Set `NEXT_PUBLIC_USE_MOCK_API=false` and rebuild/restart. True keeps the labeled recorded-answer fixture preview.
+3. Seed research using the instructions in SETUP.md. Rebuild/restart. The product always opens live conversation; the previous mock-mode flag no longer selects a recorded-answer interface. Fixtures remain available only to isolated tests.
 4. Start a new session, then choose **Connect live audio** and allow microphone access. Use HTTPS outside localhost.
 
 No credentials are committed. This change was tested with isolated model/audio fixtures and the actual SQL migrations in PGlite; a real OpenAI/Claude/Supabase session still needs verification with configured services.

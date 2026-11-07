@@ -1,6 +1,6 @@
 import type { InterviewApi } from "./contracts";
-import { mockApi } from "../../mocks/interview";
-export const isMock = process.env.NEXT_PUBLIC_USE_MOCK_API === "true";
+// The product always uses live conversation. Fixtures remain available to isolated tests.
+export const isMock = false;
 export const tokenKey = (id: string) =>
   `token:${isMock ? "mock" : "real"}:${id}`;
 export class RequestError extends Error {
@@ -96,4 +96,4 @@ export const realApi: InterviewApi = {
   },
   delete: (id) => request(`/sessions/${id}`, { method: "DELETE" }, id),
 };
-export const api = isMock ? mockApi : realApi;
+export const api = realApi;

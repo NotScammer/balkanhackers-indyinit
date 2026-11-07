@@ -1,6 +1,6 @@
 # Current frontend
 
-Real API sessions now open the live conversation screen: continuous microphone audio with mute/end/disconnect controls, interruptible interviewer speech, partial transcripts, automatic progression, clarification, deeper follow-ups, coaching notes, transcript corrections and a final grouped report. Mock mode retains the recorded-answer fixture screen. See [docs/LIVE_INTERVIEW.md](docs/LIVE_INTERVIEW.md) for setup, contracts and verification limits.
+Real API sessions now open the live conversation screen: continuous microphone audio with mute/end/disconnect controls, interruptible interviewer speech, partial transcripts, automatic progression, clarification, deeper follow-ups, coaching notes, transcript corrections and a final grouped report. The live conversation interface is now the only product flow. Recording, manual transcription and transcript-confirmation steps have been removed; fixtures remain only for isolated tests. See [docs/LIVE_INTERVIEW.md](docs/LIVE_INTERVIEW.md) for setup, contracts and verification limits.
 
 The notes below describe the earlier recorded-answer interface and remain as history.
 

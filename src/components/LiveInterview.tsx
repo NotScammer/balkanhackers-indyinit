@@ -312,9 +312,9 @@ export default function LiveInterview({ id }: { id: string }) {
       <audio
         ref={audioElement}
         autoPlay
-        controls
         aria-label="Interviewer audio playback"
         className="live-player"
+        hidden
       />
       {!view ? (
         <>
@@ -328,7 +328,23 @@ export default function LiveInterview({ id }: { id: string }) {
         </>
       ) : (
         <>
-          <p className="eyebrow">
+          <div className="room-topline">
+            <span className="tag">
+              <span className="status-dot" />
+              Your rehearsal room
+            </span>
+            <div
+              className="question-progress"
+              aria-label={`Main question ${view.mainNumber} of 3`}
+            >
+              {[1, 2, 3].map((n) => (
+                <span key={n} className={n <= view.mainNumber ? "reached" : ""}>
+                  {n}
+                </span>
+              ))}
+            </div>
+          </div>
+          <p className="eyebrow room-position">
             Live conversation · Main question {view.mainNumber} of 3
             {view.followUpNumber > 0
               ? ` · Follow-up ${view.followUpNumber} of 2`
@@ -340,15 +356,27 @@ export default function LiveInterview({ id }: { id: string }) {
             </p>
           )}
           {active && (
-            <>
+            <section className="conversation-stage">
+              <div
+                className={`voice-emblem ${connected && !muted && status.includes("speaking") ? "is-speaking" : ""}`}
+                aria-hidden="true"
+              >
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+              </div>
+              <p className="eyebrow">
+                {muted ? "MICROPHONE MUTED" : busy ? "THINKING IT THROUGH" : connected ? (status.includes("speaking") ? "YOUR INTERVIEWER" : "YOUR TURN") : "TAKE A BREATH. YOU’VE GOT THIS."}
+              </p>
               <h1 className="question-heading">{view.currentQuestion?.text}</h1>
               <p className="fine">{view.currentQuestion?.sourceLabel}</p>
               <p>
-                Speak naturally. You can interrupt, ask “What do you mean?”, or
-                ask me to repeat. Feedback follows each answer; scores come at
-                the end.
+                Just talk. Ask me to clarify, explore an idea, or take a moment
+                to think.
               </p>
-            </>
+            </section>
           )}
           <p role="status" className="live-status">
             {busy
@@ -358,7 +386,7 @@ export default function LiveInterview({ id }: { id: string }) {
                 : connected
                   ? status
                   : active
-                    ? "Microphone disconnected"
+                    ? "Ready when you are"
                     : "Interview ended"}
           </p>
           {partial && (
@@ -373,7 +401,7 @@ export default function LiveInterview({ id }: { id: string }) {
                 disabled={connecting || busy}
                 onClick={() => void connect()}
               >
-                {connecting ? "Connecting…" : "Connect live audio"}
+                {connecting ? "Connecting…" : "Start conversation"}
               </button>
             )}
             {connecting && (
@@ -403,9 +431,24 @@ export default function LiveInterview({ id }: { id: string }) {
             )}
           </div>
           {error && (
-            <p role="alert" className="error">
+            <div role="alert" className="error">
               {error}
-            </p>
+              {connected && (
+                <button
+                  onClick={() =>
+                    void audioElement.current
+                      ?.play()
+                      .catch(() =>
+                        setError(
+                          "Your browser blocked playback. Check its audio permissions.",
+                        ),
+                      )
+                  }
+                >
+                  Enable interviewer audio
+                </button>
+              )}
+            </div>
           )}
           {pending.length > 0 && (
             <section
@@ -448,9 +491,7 @@ export default function LiveInterview({ id }: { id: string }) {
             </section>
           )}
           <details open={editing !== null} className="live-history">
-            <summary>
-              Conversation and transcript corrections ({view.messages.length})
-            </summary>
+            <summary>Conversation history ({view.messages.length})</summary>
             <p className="fine">
               Transcripts are assessed automatically. Correct recognition
               mistakes here; the assessment updates without advancing the
