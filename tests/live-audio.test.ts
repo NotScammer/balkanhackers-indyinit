@@ -21,11 +21,12 @@ class Channel {
 }
 let peer: Peer;
 let channel: Channel;
+let autoReady = true;
 class Peer {
   sender = { replaceTrack: vi.fn().mockResolvedValue(undefined) };
   addTransceiver = vi.fn();
   connectionState = "connected";
-  ontrack: unknown = null;
+  ontrack: ((event: { streams: unknown[] }) => void) | null = null;
   onconnectionstatechange: (() => void) | null = null;
   constructor() {
     peer = this;
@@ -41,7 +42,12 @@ class Peer {
     return { type: "offer", sdp: "test-sdp" };
   }
   async setLocalDescription() {}
-  async setRemoteDescription() {}
+  async setRemoteDescription() {
+    if (autoReady) {
+      this.ontrack?.({ streams: [stream] });
+      channel.emit({ type: "session.created" });
+    }
+  }
   close() {
     this.connectionState = "closed";
   }
@@ -60,6 +66,8 @@ let callbacks = {
 let connection: LiveAudio;
 beforeEach(() => {
   vi.clearAllMocks();
+  autoReady = true;
+  peer = undefined as unknown as Peer;
   track.enabled = true;
   vi.stubGlobal("navigator", {
     mediaDevices: { getUserMedia: vi.fn().mockResolvedValue(stream) },
@@ -83,6 +91,33 @@ beforeEach(() => {
     } as unknown as HTMLAudioElement,
     callbacks,
   );
+});
+
+it.each([['session', 'audio'], ['audio', 'session']])('waits for both session and remote audio before the opening (%s first)', async (first, second) => {
+  autoReady = false;
+  const opening = connection.connect('test', 'First approved question');
+  await vi.waitFor(() => expect(peer?.ontrack).toBeTypeOf('function'));
+  const ready = (event: string) => event === 'session'
+    ? channel.emit({ type: 'session.created' })
+    : peer.ontrack?.({ streams: [stream] });
+  channel.onopen!();
+  expect(channel.sent).toEqual([]);
+  ready(first);
+  expect(channel.sent).toEqual([]);
+  ready(second);
+  await opening;
+  expect(channel.sent.filter(event => event.type === 'response.create')).toHaveLength(1);
+  expect(JSON.stringify(channel.sent)).toContain('First approved question');
+  channel.onopen!();
+  channel.emit({ type: 'session.created' });
+  expect(channel.sent.filter(event => event.type === 'response.create')).toHaveLength(1);
+  expect(channel.sent.some(event => event.type === 'response.cancel')).toBe(false);
+});
+
+it('starts the opening even if the channel is already open without a subsequent open event', async () => {
+  await connection.connect('test', 'First approved question');
+  expect(channel.sent.filter(event => event.type === 'response.create')).toHaveLength(1);
+  expect(JSON.stringify(channel.sent)).toContain('First approved question');
 });
 afterEach(() => {
   connection.close();

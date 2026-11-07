@@ -65,6 +65,22 @@ export class LiveAudio {
       this.stream = stream;
       const peer = new RTCPeerConnection();
       this.peer = peer;
+      let sessionReady = false;
+      let audioReady = false;
+      let openingStarted = false;
+      let openingReady = () => {};
+      const startOpening = () => {
+        if (
+          !current() || openingStarted || !sessionReady || !audioReady ||
+          this.channel?.readyState !== "open"
+        ) return;
+        openingStarted = true;
+        this.callbacks.onStatus(
+          input ? "Preparing your first question" : "Playing your recap",
+        );
+        this.speak(openingText);
+        openingReady();
+      };
       if (stream)
         stream.getAudioTracks().forEach((track) => {
           this.sender = peer.addTrack(track, stream);
@@ -74,13 +90,15 @@ export class LiveAudio {
         if (!current()) return;
         this.element.srcObject =
           event.streams[0] ?? new MediaStream([event.track]);
+        audioReady = true;
         void this.element
           .play()
           .catch(() =>
             this.callbacks.onError(
-              "Audio playback was blocked. Use the Play interviewer audio control.",
+              "Audio playback was blocked. Select Enable audio playback, then Repeat to hear the question.",
             ),
           );
+        startOpening();
       };
       peer.onconnectionstatechange = () => {
         if (!current()) return;
@@ -97,15 +115,17 @@ export class LiveAudio {
       const channel = peer.createDataChannel("oai-events");
       this.channel = channel;
       channel.onopen = () => {
-        if (current()) {
-          this.callbacks.onStatus(input ? "Listening" : "Playing your recap");
-          this.speak(openingText);
-        }
+        startOpening();
       };
       channel.onmessage = (event) => {
         if (!current()) return;
         try {
-          this.event(JSON.parse(event.data));
+          const message = JSON.parse(event.data);
+          if (message.type === "session.created") {
+            sessionReady = true;
+            startOpening();
+          }
+          this.event(message);
         } catch {
           this.callbacks.onError(
             "Could not read a live audio event. Reconnect to continue.",
@@ -148,7 +168,10 @@ export class LiveAudio {
         sdp: await response.text(),
       });
       await new Promise<void>((resolve, reject) => {
-        if (channel.readyState === "open") return resolve();
+        // WebRTC media and control events can arrive independently. Opening the
+        // data channel alone does not mean the voice session is ready to speak.
+        startOpening();
+        if (openingStarted) return resolve();
         const timer = setTimeout(
           () =>
             reject(
@@ -156,14 +179,10 @@ export class LiveAudio {
             ),
           15000,
         );
-        channel.addEventListener(
-          "open",
-          () => {
-            clearTimeout(timer);
-            resolve();
-          },
-          { once: true },
-        );
+        openingReady = () => {
+          clearTimeout(timer);
+          resolve();
+        };
       });
       if (!current()) return;
     } catch (error) {
