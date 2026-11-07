@@ -208,7 +208,7 @@ export const companyGuides: CompanyGuide[] = [
     scope: "Historical process not yet sourced",
     summary: "Practice available · history pending",
     rounds: [],
-    note: "A sourced historical round breakdown has not been added yet. You can still choose company-context practice below.",
+    note: "A sourced historical round breakdown has not been added yet. You can still choose company-context practice in the interview setup above.",
   },
   {
     id: "openai",

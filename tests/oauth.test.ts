@@ -199,12 +199,28 @@ it("uses HttpOnly, SameSite=Lax, HTTPS-secure cookies and rejects unsafe applica
   expect(authConfigured()).toBe(false);
   expect(() => authConfig()).toThrow();
 });
-it("redirects guests away from setup, interview and results pages", async () => {
+it.each([true, false])(
+  "keeps company browsing public without contacting Auth (configured: %s)",
+  async (configured) => {
+    if (!configured) vi.stubEnv("SUPABASE_PUBLISHABLE_KEY", "");
+    mocks.getUser.mockRejectedValue(new Error("Auth service unavailable"));
+    for (const path of ["/", "/api/v1/catalog"]) {
+      const response = await updateAuth(
+        new NextRequest(`https://app.example.invalid${path}`),
+      );
+      expect(response.status).toBe(200);
+      expect(response.headers.get("location")).toBeNull();
+    }
+    expect(mocks.createServerClient).not.toHaveBeenCalled();
+    expect(mocks.getUser).not.toHaveBeenCalled();
+  },
+);
+it("redirects guests away from private interview and results pages", async () => {
   mocks.getUser.mockResolvedValue({
     data: { user: null },
     error: { status: 400 },
   });
-  for (const path of ["/", "/interview/opaque-id", "/results/opaque-id"]) {
+  for (const path of ["/interview/opaque-id", "/results/opaque-id"]) {
     const response = await updateAuth(
       new NextRequest(`https://app.example.invalid${path}`),
     );
@@ -217,7 +233,9 @@ it("does not render private pages when Auth is unconfigured", async () => {
   vi.stubEnv("SUPABASE_PUBLISHABLE_KEY", "");
   expect(
     (
-      await updateAuth(new NextRequest("https://app.example.invalid/"))
+      await updateAuth(
+        new NextRequest("https://app.example.invalid/interview/opaque-id"),
+      )
     ).headers.get("location"),
   ).toContain("/login");
   expect(mocks.getUser).not.toHaveBeenCalled();

@@ -23,11 +23,9 @@ export default function AppShell({
           </Link>
           {practice === "Interview practice" ? (
             <nav className="site-navigation" aria-label="Main navigation">
-              <Link href="/#company-history">The companies</Link>
-              <Link href="/#future-roadmaps">What’s next</Link>
-              <Link href="/#practice-setup">
-                Your practice <span aria-hidden="true">↗</span>
-              </Link>
+              <Link href="/#company-history">Interviews</Link>
+              <Link href="/#company-history">Companies</Link>
+              <Link href="/#future-roadmaps">Research</Link>
             </nav>
           ) : (
             <span className="practice-name">
@@ -43,12 +41,6 @@ export default function AppShell({
           </section>
         </div>
         <footer>
-          <div className="footer-signoff">
-            <span>Here’s to</span> <em>your next chapter.</em>
-            <span className="footer-arrow" aria-hidden="true">
-              ↗
-            </span>
-          </div>
           <div className="footer-meta">
             <span>Talk To Future · A space to find your voice.</span>
             <span>Independent interview preparation.</span>

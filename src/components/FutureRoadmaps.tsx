@@ -1,7 +1,19 @@
-import { researchRoadmaps } from "../shared/research-roadmaps";
+import {
+  researchRoadmaps,
+  roadmapCompanyId,
+} from "../shared/research-roadmaps";
 import type { CSSProperties } from "react";
+import type { Catalog } from "../lib/client/contracts";
 
-export default function FutureRoadmaps() {
+export default function FutureRoadmaps({
+  busy,
+  catalog,
+  onStart,
+}: {
+  busy: boolean;
+  catalog: Catalog | null;
+  onStart: (companyId: string) => void;
+}) {
   return (
     <section
       id="future-roadmaps"
@@ -10,12 +22,7 @@ export default function FutureRoadmaps() {
     >
       <div className="company-browser-heading" data-reveal>
         <div>
-          <p className="eyebrow">02 / BEYOND THE USUAL QUESTIONS</p>
-          <h2 id="future-heading">
-            A little ahead
-            <br />
-            of <em>the curve.</em>
-          </h2>
+          <h2 id="future-heading">Future interview roadmaps</h2>
         </div>
         <span className="research-label">
           <span aria-hidden="true">✧</span> Research outlook
@@ -71,6 +78,19 @@ export default function FutureRoadmaps() {
                 {roadmap.source.title} <span aria-hidden="true">↗</span>
               </a>
             </div>
+            <button
+              className="choose-company roadmap-interview"
+              disabled={
+                busy ||
+                !catalog?.availableInterviews.some(
+                  (option) => option.companyId === roadmapCompanyId(roadmap.id),
+                )
+              }
+              aria-label={`Start ${roadmap.title} interview`}
+              onClick={() => onStart(roadmapCompanyId(roadmap.id))}
+            >
+              Start roadmap interview <span aria-hidden="true">↗</span>
+            </button>
           </article>
         ))}
       </div>

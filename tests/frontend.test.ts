@@ -111,7 +111,7 @@ test("recording format detection handles absent or unsupported MediaRecorder", (
 });
 
 test("sign-out clears interview secrets and drafts while preserving theme and unrelated data", () => {
-  const values = new Map([['token:real:s','secret'], ['draft:s:q','private answer'], ['live-pending:s','pending answer'], ['rehearsal:theme','light'], ['unrelated','keep']]);
+  const values = new Map([['token:real:s','secret'], ['draft:s:q','private answer'], ['live-pending:s','pending answer'], ['autostart:s','true'], ['talk-to-future:audio-consent','true'], ['talk-to-future:pending-interview','selected interview'], ['rehearsal:theme','light'], ['unrelated','keep']]);
   const storage = { get length() { return values.size; }, key: (i: number) => [...values.keys()][i] ?? null, removeItem: (key: string) => { values.delete(key); } } as Storage;
   clearInterviewStorage(storage);
   assert.deepEqual([...values], [['rehearsal:theme','light'], ['unrelated','keep']]);

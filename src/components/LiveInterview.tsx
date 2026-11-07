@@ -85,6 +85,15 @@ export default function LiveInterview({ id }: { id: string }) {
       if (expiryTimer.current) clearTimeout(expiryTimer.current);
     };
   }, [id, key]);
+  useEffect(() => {
+    if (view?.status !== "active") return;
+    const autoStartKey = `autostart:${id}`;
+    if (sessionStorage.getItem(autoStartKey) !== "true") return;
+    sessionStorage.removeItem(autoStartKey);
+    void connect();
+    // Only a newly selected interview auto-connects; manual reconnect stays available.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, view?.status]);
   async function processQueue() {
     if (working.current || !queue.current.length || !mounted.current) return;
     working.current = true;

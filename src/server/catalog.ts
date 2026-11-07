@@ -1,6 +1,7 @@
 import type { Catalog, CreateSessionRequest } from "@/shared/contracts";
 import { AppError } from "./errors";
 import { companyGuides } from "@/shared/company-guides";
+import { researchRoadmaps, roadmapCompanyId } from "@/shared/research-roadmaps";
 const companies = companyGuides.map(({ id, name }) => ({ id, name }));
 const roles = [{ id: "software-engineer", name: "Software Engineer" }];
 const interviewModes = [
@@ -10,14 +11,31 @@ const interviewModes = [
   "mixed",
 ] as const;
 export const catalog: Catalog = {
-  companies,
+  companies: [
+    ...companies,
+    ...researchRoadmaps.map((roadmap) => ({
+      id: roadmapCompanyId(roadmap.id),
+      name: roadmap.title,
+    })),
+  ],
   roles,
   interviewModes: [...interviewModes],
-  availableInterviews: companies.flatMap((c) =>
-    roles.flatMap((r) =>
-      interviewModes.map((round) => ({ companyId: c.id, roleId: r.id, round })),
+  availableInterviews: [
+    ...companies.flatMap((c) =>
+      roles.flatMap((r) =>
+        interviewModes.map((round) => ({
+          companyId: c.id,
+          roleId: r.id,
+          round,
+        })),
+      ),
     ),
-  ),
+    ...researchRoadmaps.map((roadmap) => ({
+      companyId: roadmapCompanyId(roadmap.id),
+      roleId: "software-engineer",
+      round: "system_design" as const,
+    })),
+  ],
 };
 export function validateCombination(input: CreateSessionRequest) {
   if (

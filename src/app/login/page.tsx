@@ -1,4 +1,5 @@
 import AppShell from "../../components/AppShell";
+import Link from "next/link";
 import { safeReturnPath } from "@/lib/auth-paths";
 import { authConfigured } from "@/server/oauth/config";
 export default async function Login({
@@ -11,7 +12,7 @@ export default async function Login({
   return (
     <AppShell practice="Welcome">
       <p className="eyebrow">Your interview practice</p>
-      <h1>Sign in to Rehearsal.</h1>
+      <h1>Sign in to Talk To Future.</h1>
       <p>
         Continue with Google to start an interview. Your questions, answers, and
         feedback are private to your signed-in account and interview session.
@@ -37,8 +38,13 @@ export default async function Login({
         </button>
       </form>
       <p className="fine">
-        Google handles your sign-in. Rehearsal never receives your Google
+        Google handles your sign-in. Talk To Future never receives your Google
         password. Interview sessions expire after 24 hours.
+      </p>
+      <p>
+        <Link href="/#company-history">
+          ← Explore companies and interview guides
+        </Link>
       </p>
     </AppShell>
   );

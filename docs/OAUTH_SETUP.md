@@ -1,6 +1,6 @@
 # Required Google OAuth with Supabase
 
-This branch requires a verified Supabase Google identity before interview creation or any private interview operation. The setup, interview and results pages redirect signed-out visitors to `/login`. There is no guest entry. The public catalog and the separately secret-protected research cron remain available without a user login.
+This branch requires a verified Supabase Google identity before interview creation or any private interview operation. The front page, company guides, research roadmaps and catalog are public, including when Auth is unconfigured or unavailable. Private interview and results pages redirect signed-out visitors to `/login`. Browsing does not create an interview. The separately secret-protected research cron remains available without a user login.
 
 The existing interview Bearer capability remains an additional session-specific check. A private request must have both the signed-in owner's Supabase cookie and the correct interview token. Keep sending the existing `Authorization: Bearer <sessionToken>` header. The browser automatically includes its same-origin Auth cookie. A stolen interview token alone no longer grants access.
 
@@ -44,7 +44,7 @@ Hosted migrations have not been applied or verified here. Automated database tes
 
 ## End-to-end flow
 
-1. A guest visits `/`, `/interview/:id`, or `/results/:id`. Next.js Proxy redirects to `/login` with a strictly allowlisted local return path.
+1. A guest visits `/` to browse companies, interview processes and research roadmaps. Starting an interview sends them to sign-in while preserving their setup choices. Direct visits to `/interview/:id` or `/results/:id` redirect to `/login` with a strictly allowlisted local return path.
 2. The Google button POSTs to `/auth/login`. An Origin check prevents cross-site login submissions. A per-request `@supabase/ssr` client starts Google OAuth using PKCE and stores the verifier cookie.
 3. Google/Supabase redirect to `/auth/callback?code=...`. The callback exchanges the one-time code using the matching verifier, verifies the user with `auth.getUser()`, confirms the Google identity, and redirects to `/` or an allowed interview/results path. Failed/cancelled/replayed codes return a generic login error without exposing upstream details.
 4. Supabase session cookies are HttpOnly, SameSite=Lax, path `/`, and Secure on HTTPS deployments. The browser never needs to read access/refresh tokens. This implementation intentionally uses server-only Auth clients, not `createBrowserClient`.
@@ -65,7 +65,7 @@ Before a live demonstration:
 
 - Configure the Supabase Google provider, Google consent/test users, app callback allowlist and exact `APP_URL`.
 - Apply migration 004 and verify no browser read/RPC policies were added.
-- Confirm guest page redirects and direct API creation is denied without a login.
+- Confirm the home page and company guides load while signed out; private interview/results pages redirect and direct API creation is denied without a login.
 - Complete Google sign-in, start an interview, refresh it, sign out, and confirm its API is denied.
 - Sign in as a second Google account; even with the first account's interview token, reads/voice credentials/deletion must be denied.
 - Verify cookie refresh and error recovery on the actual deployed HTTPS origin.

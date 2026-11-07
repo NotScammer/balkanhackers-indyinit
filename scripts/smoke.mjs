@@ -129,12 +129,35 @@ try {
   assert(ready, "Production server did not become ready");
   const catalog = await fetch(`${origin}/api/v1/catalog`);
   assert.equal(catalog.status, 200);
-  assert((await catalog.json()).interviewModes.includes("mixed"));
+  const interviewCatalog = await catalog.json();
+  assert(interviewCatalog.interviewModes.includes("mixed"));
+  for (const id of ["agents", "retrieval", "inference"]) {
+    assert(interviewCatalog.availableInterviews.some((option) =>
+      option.companyId === `roadmap-${id}` && option.roleId === "software-engineer" && option.round === "system_design",
+    ));
+  }
   const guest = await fetch(origin, { redirect: "manual" });
-  assert.equal(
-    new URL(guest.headers.get("location"), origin).pathname,
-    "/login",
-  );
+  assert.equal(guest.status, 200);
+  assert.equal(guest.headers.get("location"), null);
+  const publicHome = await guest.text();
+  assert(!publicHome.includes('id="practice-setup"'));
+  assert.equal((publicHome.match(/Start roadmap interview/g) ?? []).length, 3);
+  for (const content of [
+    'id="company-history"',
+    'id="future-roadmaps"',
+    'id="company-google"',
+    'id="company-microsoft"',
+    'id="company-monzo"',
+    'id="company-gitlab"',
+  ])
+    assert(publicHome.includes(content), `Public home is missing ${content}`);
+  for (const path of ["/interview/opaque-id", "/results/opaque-id"]) {
+    const privatePage = await fetch(`${origin}${path}`, { redirect: "manual" });
+    assert.equal(privatePage.status, 307);
+    const destination = new URL(privatePage.headers.get("location"), origin);
+    assert.equal(destination.pathname, "/login");
+    assert.equal(destination.searchParams.get("returnTo"), path);
+  }
   const signInPage = await fetch(`${origin}/login`);
   assert.equal(signInPage.status, 200);
   const html = await signInPage.text();
@@ -222,10 +245,12 @@ try {
     headers: { Cookie: cookieHeader() },
   });
   assert.equal(afterLogout.status, 401);
+  const publicAfterLogout = await fetch(origin, { redirect: "manual" });
+  assert.equal(publicAfterLogout.status, 200);
   assert(verificationCalls > 0);
   assert.deepEqual(upstreamErrors, []);
   console.log(
-    "Production HTTP smoke passed: login gate, OAuth PKCE exchange, HttpOnly cookies, verified identity, sign-out, CSRF protection, cron protection and request IDs. Auth authority was mocked locally.",
+    "Production HTTP smoke passed: public company guides and roadmaps, private interview gate, OAuth PKCE exchange, HttpOnly cookies, verified identity, sign-out, CSRF protection, cron protection and request IDs. Auth authority was mocked locally.",
   );
 } finally {
   child.kill("SIGTERM");

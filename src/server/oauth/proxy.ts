@@ -7,6 +7,13 @@ import { safeReturnPath } from "@/lib/auth-paths";
 export async function updateAuth(request: NextRequest) {
   let response = NextResponse.next({ request });
   response.headers.set("Cache-Control", "no-store, private");
+  // Browsing companies and research must not depend on an Auth session or
+  // provider availability. Private pages and APIs still verify the owner.
+  if (
+    request.nextUrl.pathname === "/" ||
+    request.nextUrl.pathname === "/api/v1/catalog"
+  )
+    return response;
   const isApi = request.nextUrl.pathname.startsWith("/api/");
   const isLogin = request.nextUrl.pathname === "/login";
   const loginRedirect = () => {

@@ -99,3 +99,12 @@ export const researchRoadmaps = [
     },
   },
 ];
+
+// Store the roadmap as the session's interview target so every later question
+// and follow-up keeps the same curriculum without a separate client-only flag.
+export const roadmapCompanyId = (id: string) => `roadmap-${id}`;
+export function interviewRoadmap(companyId: string) {
+  return researchRoadmaps.find(
+    (roadmap) => roadmapCompanyId(roadmap.id) === companyId,
+  );
+}

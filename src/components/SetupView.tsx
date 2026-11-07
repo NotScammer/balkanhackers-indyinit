@@ -2,9 +2,8 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { api, tokenKey } from "../lib/client/api";
+import { api, RequestError, tokenKey } from "../lib/client/api";
 import type { Catalog, Setup, InterviewMode } from "../lib/client/contracts";
-import { modes } from "../lib/client/interview-model";
 import {
   companyGroups,
   companyGuides,
@@ -13,27 +12,17 @@ import {
 import FutureRoadmaps from "./FutureRoadmaps";
 import FutureHero from "./FutureHero";
 
-const interviewOrder: InterviewMode[] = [
-  "behavioral",
-  "technical",
-  "system_design",
-  "mixed",
-];
-const descriptions: Record<InterviewMode, string> = {
-  behavioral: "Experience, decisions & impact",
-  technical: "Explain concepts & problem solving",
-  system_design: "Architecture, scale & trade-offs",
-  mixed: "A little of every interview type",
-};
+const consentKey = "talk-to-future:audio-consent";
+const pendingKey = "talk-to-future:pending-interview";
 
 export default function SetupView() {
   const router = useRouter();
-  const checkout = useRef<HTMLElement>(null);
+  const consentDialog = useRef<HTMLDialogElement>(null);
+  const starting = useRef(false);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
-  const [setup, setSetup] = useState<Setup | null>(null);
+  const [pending, setPending] = useState<Setup | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [supported, setSupported] = useState(false);
   const [filter, setFilter] = useState<CompanyGroup | "all">("all");
   const [attempt, setAttempt] = useState(0);
 
@@ -42,46 +31,10 @@ export default function SetupView() {
     api
       .catalog()
       .then((c) => {
-        if (!live) return;
-        setCatalog(c);
-        setSupported(
-          !!navigator.mediaDevices?.getUserMedia &&
-            typeof RTCPeerConnection !== "undefined",
-        );
-        const first = c.availableInterviews[0];
-        if (!first) {
-          setError("No practice is available yet. Please try again later.");
-          return;
-        }
-        let selected: Setup = { ...first, audioProcessingConsent: false };
-        try {
-          const saved = JSON.parse(
-            sessionStorage.getItem("talk-to-future:setup") ?? "null",
-          );
-          if (
-            saved &&
-            c.availableInterviews.some(
-              (a) =>
-                a.companyId === saved.companyId &&
-                a.roleId === saved.roleId &&
-                a.round === saved.round,
-            )
-          ) {
-            selected = {
-              companyId: saved.companyId,
-              roleId: saved.roleId,
-              round: saved.round,
-              audioProcessingConsent: saved.audioProcessingConsent === true,
-            };
-          }
-        } catch {}
-        setSetup(selected);
+        if (live) setCatalog(c);
       })
       .catch(() => {
-        if (live)
-          setError(
-            "Could not load practice options. You can still explore the guides and roadmaps.",
-          );
+        if (live) setError("Could not load interviews. Please try again.");
       });
     return () => {
       live = false;
@@ -89,71 +42,100 @@ export default function SetupView() {
   }, [attempt]);
 
   useEffect(() => {
-    if (setup) {
-      try {
-        sessionStorage.setItem("talk-to-future:setup", JSON.stringify(setup));
-      } catch {}
-    }
-  }, [setup]);
+    if (!catalog) return;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(pendingKey) ?? "null");
+      sessionStorage.removeItem(pendingKey);
+      if (
+        saved?.audioProcessingConsent === true &&
+        catalog.availableInterviews.some(
+          (option) =>
+            option.companyId === saved.companyId &&
+            option.roleId === saved.roleId &&
+            option.round === saved.round,
+        )
+      ) {
+        const next: Setup = {
+          companyId: saved.companyId,
+          roleId: saved.roleId,
+          round: saved.round,
+          audioProcessingConsent: true,
+        };
+        setPending(next);
+        void begin(next);
+      }
+    } catch {}
+    // Resume a deliberate selection once the catalog is ready after sign-in.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalog]);
 
-  const selectedCompany = catalog?.companies.find(
-    (company) => company.id === setup?.companyId,
-  );
-  const selectedRole = catalog?.roles.find((role) => role.id === setup?.roleId);
-  const selectedOptions =
-    catalog?.availableInterviews.filter(
-      (option) => option.companyId === setup?.companyId,
-    ) ?? [];
-  const roleIds = [...new Set(selectedOptions.map((option) => option.roleId))];
-  const change = (patch: Partial<Setup>) => {
-    if (setup) setSetup({ ...setup, ...patch });
-  };
-  function chooseCompany(companyId: string) {
-    if (!catalog || !setup || busy) return;
-    const choices = catalog.availableInterviews.filter(
-      (option) => option.companyId === companyId,
-    );
+  useEffect(() => {
+    const dialog = consentDialog.current;
+    if (pending && !pending.audioProcessingConsent) {
+      if (!dialog?.open) dialog?.showModal();
+    } else if (dialog?.open) dialog.close();
+  }, [pending]);
+
+  function chooseInterview(
+    companyId: string,
+    roleId: string,
+    round: InterviewMode,
+  ) {
+    if (!catalog || starting.current) return;
     const choice =
-      choices.find(
+      catalog.availableInterviews.find(
         (option) =>
-          option.roleId === setup.roleId && option.round === setup.round,
+          option.companyId === companyId &&
+          option.roleId === roleId &&
+          option.round === round,
       ) ??
-      choices.find((option) => option.roleId === setup.roleId) ??
-      choices[0];
+      catalog.availableInterviews.find(
+        (option) => option.companyId === companyId && option.roleId === roleId,
+      );
     if (!choice) return;
-    change(choice);
-    checkout.current?.scrollIntoView({
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-        ? "instant"
-        : "smooth",
-      block: "start",
-    });
-    checkout.current?.focus({ preventScroll: true });
+    setError("");
+    let consent = false;
+    try {
+      consent = sessionStorage.getItem(consentKey) === "true";
+    } catch {}
+    const next: Setup = { ...choice, audioProcessingConsent: consent };
+    setPending(next);
+    if (consent) void begin(next);
   }
-  async function begin() {
-    if (busy || !setup) return;
-    if (!setup.audioProcessingConsent || !supported) {
+
+  async function begin(selection: Setup) {
+    if (starting.current || !selection.audioProcessingConsent) return;
+    if (
+      !navigator.mediaDevices?.getUserMedia ||
+      typeof RTCPeerConnection === "undefined"
+    ) {
       setError(
-        "Allow live audio and use a browser with microphone access to start.",
+        "Live interviews need a browser with microphone support. Open this page in a supported browser to continue.",
       );
       return;
     }
+    starting.current = true;
     setBusy(true);
     setError("");
     try {
-      const s = await api.create(setup);
+      // Kept only across an authentication redirect; all other outcomes clear it.
+      sessionStorage.setItem(pendingKey, JSON.stringify(selection));
+      const s = await api.create(selection);
+      sessionStorage.removeItem(pendingKey);
       sessionStorage.setItem(tokenKey(s.sessionId), s.sessionToken);
-      sessionStorage.setItem(
-        `consent:${s.sessionId}`,
-        String(setup.audioProcessingConsent),
-      );
+      sessionStorage.setItem(`consent:${s.sessionId}`, "true");
       sessionStorage.setItem(`input:${s.sessionId}`, "voice");
+      sessionStorage.setItem(`autostart:${s.sessionId}`, "true");
       router.push(`/interview/${s.sessionId}`);
-    } catch {
+    } catch (cause) {
+      if (cause instanceof RequestError && cause.code === "UNAUTHORIZED")
+        return;
+      sessionStorage.removeItem(pendingKey);
       setError(
-        "Could not start the interview. Your choices are saved; please try again.",
+        "Could not start the interview. Please select it again to retry.",
       );
     } finally {
+      starting.current = false;
       setBusy(false);
     }
   }
@@ -161,6 +143,25 @@ export default function SetupView() {
   return (
     <div className="company-browser">
       <FutureHero />
+      <div className="interview-browser-status" aria-live="polite">
+        {!catalog && !error && <p role="status">Loading interviews…</p>}
+        {busy && <p role="status">Preparing your interview…</p>}
+        {error && (!pending || pending.audioProcessingConsent) && (
+          <div className="error" role="alert">
+            <p>{error}</p>
+            {!catalog && (
+              <button
+                onClick={() => {
+                  setError("");
+                  setAttempt((value) => value + 1);
+                }}
+              >
+                Retry interviews
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
       <section
         id="company-history"
@@ -169,20 +170,17 @@ export default function SetupView() {
       >
         <div className="company-browser-heading" data-reveal>
           <div>
-            <p className="eyebrow">01 / THE INTERVIEW PLAYBOOK</p>
-            <h2 id="history-heading">
-              Find your kind
-              <br />
-              of <em>company.</em>
-            </h2>
+            <h2 id="history-heading">Company interviews</h2>
           </div>
           <span className="section-label">
             Historical & published processes
           </span>
         </div>
         <p className="section-description">
-          Round breakdowns and assessment formats, grouped by company. Counts
-          appear where documented; ↔ means the count varies or is unpublished.
+          Select a company and role to start. Each interview includes
+          behavioral, technical and system design questions, with adaptive
+          follow-ups. Published process guides are below; ↔ means the count
+          varies or is unpublished.
         </p>
         <div
           className="company-filters"
@@ -228,10 +226,7 @@ export default function SetupView() {
                     const index = companyGuides.findIndex(
                       (guide) => guide.id === company.id,
                     );
-                    const selected = setup?.companyId === company.id;
-                    const available = catalog?.availableInterviews.some(
-                      (option) => option.companyId === company.id,
-                    );
+                    const selected = pending?.companyId === company.id;
                     return (
                       <article
                         className={`company-group company-color-${index % 6} ${selected ? "has-selection" : ""}`}
@@ -284,7 +279,7 @@ export default function SetupView() {
                         ) : (
                           <p className="history-empty">
                             A historical breakdown is on our research list.
-                            Company-context practice is available below.
+                            Start an interview for this company below.
                           </p>
                         )}
                         <details className="process-details">
@@ -315,17 +310,42 @@ export default function SetupView() {
                             <span>No sourced round counts yet.</span>
                           )}
                         </div>
-                        <button
-                          className="choose-company"
-                          disabled={busy || !available}
-                          aria-pressed={selected}
-                          onClick={() => chooseCompany(company.id)}
-                        >
-                          {selected
-                            ? "Practice selected company"
-                            : `Practice with ${company.name}`}
-                          <span aria-hidden="true">{selected ? "✓" : "↗"}</span>
-                        </button>
+                        <div className="company-interview-actions">
+                          {catalog ? (
+                            catalog.roles
+                              .filter((role) =>
+                                catalog.availableInterviews.some(
+                                  (option) =>
+                                    option.companyId === company.id &&
+                                    option.roleId === role.id,
+                                ),
+                              )
+                              .map((role) => (
+                                <button
+                                  key={role.id}
+                                  className="choose-company"
+                                  disabled={busy}
+                                  aria-label={`Start ${company.name} ${role.name} interview`}
+                                  onClick={() =>
+                                    chooseInterview(
+                                      company.id,
+                                      role.id,
+                                      "mixed",
+                                    )
+                                  }
+                                >
+                                  {busy && selected
+                                    ? "Starting interview…"
+                                    : `${company.name} · ${role.name}`}
+                                  <span aria-hidden="true">↗</span>
+                                </button>
+                              ))
+                          ) : (
+                            <button className="choose-company" disabled>
+                              Loading interview…
+                            </button>
+                          )}
+                        </div>
                       </article>
                     );
                   })}
@@ -338,150 +358,69 @@ export default function SetupView() {
         </p>
       </section>
 
-      <section
-        id="practice-setup"
-        className="selection-checkout"
-        data-reveal
-        ref={checkout}
-        tabIndex={-1}
-        aria-labelledby="practice-heading"
+      <FutureRoadmaps
+        busy={busy}
+        catalog={catalog}
+        onStart={(companyId) =>
+          chooseInterview(companyId, "software-engineer", "system_design")
+        }
+      />
+      <dialog
+        ref={consentDialog}
+        className="interview-consent"
+        aria-labelledby="consent-heading"
+        aria-describedby="consent-description"
+        onCancel={(event) => {
+          if (busy) event.preventDefault();
+          else setPending(null);
+        }}
+        onClose={() => {
+          if (!busy) setPending(null);
+        }}
       >
-        <div className="selection-summary" key={setup?.companyId}>
-          <p className="eyebrow">YOUR AMBITION. YOUR VOICE.</p>
-          <h2 id="practice-heading">
-            {selectedCompany?.name ?? "Your next Talk To Future interview"}
-          </h2>
-          <p>
-            {selectedRole?.name ?? "Choose a company to begin"} · 3 main
-            questions · Adaptive follow-ups
+        <h2 id="consent-heading">Ready for your interview?</h2>
+        <p className="consent-target">
+          {
+            catalog?.companies.find(
+              (company) => company.id === pending?.companyId,
+            )?.name
+          }
+          {" · "}
+          {catalog?.roles.find((role) => role.id === pending?.roleId)?.name}
+        </p>
+        <p id="consent-description">
+          This interview uses your microphone. Audio streams to OpenAI.
+          Transcripts go to Claude and are saved with your session. Provider
+          retention may differ.
+        </p>
+        <p className="fine">
+          Sign in with Google if prompted. Your interview will continue
+          automatically.
+        </p>
+        {error && (
+          <p className="error" role="alert">
+            {error}
           </p>
-          <p className="practice-explanation">
-            Practice is a generated voice conversation. Technical rounds focus
-            on spoken reasoning; historical coding assessments are shown for
-            context.
-          </p>
-          <div className="practice-doodle" aria-hidden="true">
-            <svg viewBox="0 0 240 90" fill="none">
-              <path d="M7 68c51-66 79-35 88-13 12 30-35 15-17-8 35-44 87-28 134-5m-17-21 20 21-24 13" />
-            </svg>
-            <span>You’ve got this.</span>
-          </div>
+        )}
+        <div className="consent-actions">
+          <button disabled={busy} onClick={() => setPending(null)}>
+            Cancel
+          </button>
+          <button
+            className="primary"
+            disabled={busy}
+            onClick={() => {
+              if (!pending) return;
+              try {
+                sessionStorage.setItem(consentKey, "true");
+              } catch {}
+              void begin({ ...pending, audioProcessingConsent: true });
+            }}
+          >
+            {busy ? "Starting interview…" : "Agree and start interview"}
+          </button>
         </div>
-        <div className="selection-start">
-          {setup && catalog ? (
-            <>
-              {roleIds.length > 1 && (
-                <label>
-                  Role
-                  <select
-                    disabled={busy}
-                    value={setup.roleId}
-                    onChange={(event) => {
-                      const option =
-                        selectedOptions.find(
-                          (option) =>
-                            option.roleId === event.target.value &&
-                            option.round === setup.round,
-                        ) ??
-                        selectedOptions.find(
-                          (option) => option.roleId === event.target.value,
-                        );
-                      if (option) change(option);
-                    }}
-                  >
-                    {roleIds.map((id) => (
-                      <option key={id} value={id}>
-                        {catalog.roles.find((role) => role.id === id)?.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              <fieldset className="practice-modes" disabled={busy}>
-                <legend>Choose your practice round</legend>
-                {interviewOrder
-                  .filter((round) =>
-                    selectedOptions.some(
-                      (option) =>
-                        option.roleId === setup.roleId &&
-                        option.round === round,
-                    ),
-                  )
-                  .map((round) => (
-                    <label
-                      key={round}
-                      className={`company-interview ${setup.round === round ? "selected" : ""}`}
-                    >
-                      <input
-                        type="radio"
-                        name="practice-round"
-                        value={round}
-                        checked={setup.round === round}
-                        onChange={() => change({ round })}
-                      />
-                      <span className="interview-copy">
-                        <strong>{modes[round].title}</strong>
-                        <small>{descriptions[round]}</small>
-                      </span>
-                      <span className="interview-indicator" aria-hidden="true">
-                        {setup.round === round ? "✓" : "○"}
-                      </span>
-                    </label>
-                  ))}
-              </fieldset>
-              <label className="check">
-                <input
-                  type="checkbox"
-                  disabled={busy}
-                  checked={setup.audioProcessingConsent}
-                  onChange={(event) =>
-                    change({ audioProcessingConsent: event.target.checked })
-                  }
-                />
-                <span>
-                  I agree to live audio processing.
-                  <small>
-                    Audio streams to OpenAI. Transcripts go to Claude and are
-                    saved with your session. Provider retention may differ.
-                  </small>
-                </span>
-              </label>
-              <button
-                className="primary start-button"
-                disabled={busy || !setup.audioProcessingConsent || !supported}
-                onClick={() => void begin()}
-              >
-                {busy ? "Preparing your interview…" : "Start this interview"}
-                <span aria-hidden="true">↗</span>
-              </button>
-              {!supported && (
-                <p className="fine" role="status">
-                  Live audio needs microphone access and a supported browser.
-                </p>
-              )}
-            </>
-          ) : (
-            !error && <p role="status">Loading practice options…</p>
-          )}
-          {error && (
-            <div className="error" role="alert">
-              <p>{error}</p>
-              {!setup && (
-                <button
-                  onClick={() => {
-                    setError("");
-                    setAttempt((value) => value + 1);
-                  }}
-                >
-                  Retry practice options
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </section>
-
-      <FutureRoadmaps />
+      </dialog>
       <div className="company-browser-footnote">
         <span>
           Independent preparation. No company endorsement. Practice questions

@@ -12,6 +12,9 @@ import { aiEvaluationSchema, generatedQuestionSchema } from '../src/shared/schem
 import { decideNext } from '../src/server/interviews/adaptive';
 import { payloadHash } from '../src/server/interviews/service';
 import { realtimeConfig } from '../src/server/realtime';
+import { researchRoadmaps, roadmapCompanyId } from '../src/shared/research-roadmaps';
+import { catalog, validateCombination } from '../src/server/catalog';
+import { generateQuestion } from '../src/server/questions';
 
 const assessment = (kind: string) => ({
   questionKind: kind, rubricVersion: kind === 'system_design' ? 'system-design-v1' : `${kind}-v1`,
@@ -21,6 +24,17 @@ const assessment = (kind: string) => ({
   adaptiveNextAction: { action: 'follow_up', weaknesses: ['Failure modes'], reasoning: 'Probe reliability', targetTopic: forecast.topic },
 });
 let serial = 0;
+const roadmapTexts = [
+  'Design a permission boundary for autonomous refund approvals with partial tool failures.',
+  'Explain how you would audit escalations when a customer disputes an automated decision.',
+  'Propose an evaluation suite that detects unsafe actions before a release reaches production.',
+  'Describe an isolation strategy for concurrent workflows sharing a constrained tool budget.',
+  'How would you recover a durable workflow after a provider times out during execution?',
+  'Compare rollback policies when an external action cannot be reversed automatically.',
+  'Plan a staged rollout with measurable acceptance criteria and explicit stop conditions.',
+  'Investigate a sharp increase in operational cost while task completion remains stable.',
+  'Bound the blast radius of a compromised downstream integration across customer accounts.',
+];
 function mockAI() {
   return { model: 'test-provider-only', generate: vi.fn<StructuredAI['generate']>(async <T>(schema: z.ZodType<T>, _instruction: string, input: unknown): Promise<T> => {
     const data = input as Record<string, unknown>;
@@ -220,5 +234,77 @@ describe('frontend integration', () => {
     expect((await api.frontendGet(request(), s.sessionId)).status).toBe(401);
     const report = await (await api.report(request(s.sessionToken), s.sessionId)).json();
     expect(report.answers).toHaveLength(3);
+  });
+});
+
+describe('roadmap interviews', () => {
+  function roadmapAI() {
+    let index = 0;
+    const contexts: Record<string, unknown>[] = [];
+    return {
+      model: 'roadmap-test-only',
+      contexts,
+      generate: async <T>(schema: z.ZodType<T>, _instruction: string, raw: unknown): Promise<T> => {
+        const data = raw as Record<string, unknown>;
+        contexts.push(data);
+        if ('utterance' in data) return schema.parse({ intent: 'answer', explanation: '' });
+        if ('confirmedTranscript' in data) return schema.parse(assessment('system_design'));
+        return schema.parse({ text: roadmapTexts[index++ % roadmapTexts.length], kind: 'system_design', topic: data.topic, difficulty: data.difficulty, forecastId: null, evidenceIds: [], assessmentGuidance: 'Assess reasoning using the roadmap skills.', expectedConcepts: ['Validation'] });
+      },
+    };
+  }
+
+  it('offers every roadmap as a valid interview and creates it without unrelated forecast data', async () => {
+    const provider = roadmapAI();
+    const readForecasts = vi.spyOn(db, 'forecasts').mockResolvedValue([]);
+    try {
+      const service = createApi({ authenticate: async () => testUser, db, ai: () => provider, dataMode: 'verified', rateSalt: 'test', dailyLimit: 100, realtime: async () => ({}) });
+      for (const roadmap of researchRoadmaps) {
+        const companyId = roadmapCompanyId(roadmap.id);
+        const selection = { companyId, roleId: 'software-engineer', round: 'system_design' as const, difficulty: 'intermediate' as const, audioProcessingConsent: true };
+        expect(catalog.availableInterviews).toContainEqual({ companyId, roleId: selection.roleId, round: selection.round });
+        expect(() => validateCombination(selection)).not.toThrow();
+        expect(() => validateCombination({ ...selection, round: 'mixed' })).toThrow();
+        const response = await service.create(request(undefined, selection));
+        expect(response.status).toBe(201);
+        const session = await response.json() as CreateSessionResponse;
+        const saved = (await db.snapshot(session.sessionId))!;
+        expect(saved.session.company_id).toBe(companyId);
+        expect(session.currentTurn!.question).toMatchObject({ topic: roadmap.title, kind: 'system_design', forecastId: null, evidenceIds: [] });
+        expect(session.currentTurn!.question.sourceLabel).toContain('editorial learning roadmap');
+        const call = provider.contexts.at(-1)! as { roadmap: unknown };
+        expect(call.roadmap).toMatchObject({ skills: roadmap.skills, steps: roadmap.steps });
+      }
+      expect(readForecasts).not.toHaveBeenCalled();
+    } finally { readForecasts.mockRestore(); }
+  });
+
+  it('keeps the selected curriculum through live follow-ups, reloads and all three main questions', async () => {
+    const provider = roadmapAI();
+    const service = createApi({ authenticate: async () => testUser, db, ai: () => provider, dataMode: 'verified', rateSalt: 'test', dailyLimit: 100, realtime: async () => ({}) });
+    const roadmap = researchRoadmaps[0];
+    const response = await service.create(request(undefined, { companyId: roadmapCompanyId(roadmap.id), roleId: 'software-engineer', round: 'system_design', audioProcessingConsent: true }));
+    const session = await response.json() as CreateSessionResponse;
+    let view = await (await service.live.get(request(session.sessionToken), session.sessionId)).json();
+    for (let index = 0; index < 9; index++) {
+      expect(view.currentQuestion.topic).toBe(roadmap.title);
+      const turn = await service.live.turn(request(session.sessionToken, { kind: 'utterance', clientRequestId: randomUUID(), revision: view.revision, questionId: view.currentQuestion.id, transcript: 'I measured latency under load and verified the trade-offs.' }), session.sessionId);
+      expect(turn.status).toBe(200);
+      view = await (await service.live.get(request(session.sessionToken), session.sessionId)).json();
+    }
+    expect(view.status).toBe('completed');
+    expect(view.report.answers).toHaveLength(3);
+    expect(view.report.answers.every((answer: { question: { topic: string } }) => answer.question.topic === roadmap.title)).toBe(true);
+    const questions = provider.contexts.filter((data) => 'roadmap' in data);
+    expect(questions).toHaveLength(9);
+    expect((questions[1] as { followUp: unknown }).followUp).toMatchObject({ parentQuestion: roadmapTexts[0], weaknesses: ['Failure modes'] });
+  });
+
+  it('rejects an off-topic roadmap output or invented forecast references', async () => {
+    const selection = { companyId: roadmapCompanyId('agents'), roleId: 'software-engineer', round: 'system_design' as const, difficulty: 'intermediate' as const, audioProcessingConsent: true };
+    for (const patch of [{ topic: 'Unrelated inference topic' }, { forecastId: forecast.id, evidenceIds: [forecast.evidence[0].id] }]) {
+      const provider: StructuredAI = { model: 'invalid-roadmap-test', generate: async <T>(schema: z.ZodType<T>) => schema.parse({ text: roadmapTexts[0], kind: 'system_design', topic: researchRoadmaps[0].title, difficulty: 'intermediate', forecastId: null, evidenceIds: [], assessmentGuidance: 'Assess the reasoning carefully.', expectedConcepts: ['Validation'], ...patch }) };
+      await expect(generateQuestion(db, provider, selection, [], { kind: 'system_design', followUp: false, targetTopic: '', weaknesses: [] }, 'verified')).rejects.toMatchObject({ code: 'AI_INVALID_OUTPUT' });
+    }
   });
 });

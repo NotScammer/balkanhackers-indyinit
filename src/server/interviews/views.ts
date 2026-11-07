@@ -6,7 +6,7 @@ export function publicQuestion(q: QuestionRow | SavedQuestion): Question {
   const kind = row ? q.question_kind : q.kind;
   return { id: q.id, text: row ? q.question_text : q.text, kind, topic: q.topic, difficulty: q.difficulty,
     maxAnswerSeconds: { behavioral: 180, technical: 300, system_design: 600 }[kind], origin: 'generated',
-    sourceLabel: snapshot?.data_mode === 'illustrative' ? 'DEMO / ILLUSTRATIVE forecast; synthetic evidence' : snapshot ? 'Generated practice grounded in cited research; forecast is a hypothesis' : 'Generated behavioral practice',
+    sourceLabel: snapshot?.data_mode === 'illustrative' ? 'DEMO / ILLUSTRATIVE forecast; synthetic evidence' : snapshot ? 'Generated practice grounded in cited research; forecast is a hypothesis' : kind === 'behavioral' ? 'Generated behavioral practice' : 'Generated interview from an editorial learning roadmap',
     forecastId: row ? q.forecast_id : q.forecastId, evidenceIds: row ? q.evidence_ids : q.evidenceIds, isFollowUp: row ? q.is_follow_up : q.isFollowUp,
   };
 }

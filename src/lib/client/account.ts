@@ -5,9 +5,11 @@ export function clearInterviewStorage(storage: Storage) {
     "draft:",
     "consent:",
     "input:",
+    "autostart:",
     "read:",
     "question-cache:",
     "live-pending:",
+    "talk-to-future:",
   ];
   for (let index = storage.length - 1; index >= 0; index--) {
     const key = storage.key(index);

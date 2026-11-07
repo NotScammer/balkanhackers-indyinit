@@ -1,15 +1,15 @@
 # Talk To Future
 
-**Rehearsal** is a hackathon interview-practice application built with Next.js, TypeScript, Supabase, Claude, and OpenAI Realtime. It generates original practice questions using saved industry and academic research, runs a live spoken interview, and produces feedback grounded in the candidate's transcript.
+**Talk To Future** is a hackathon interview-practice application built with Next.js, TypeScript, Supabase, Claude, and OpenAI Realtime. It generates original practice questions using saved industry and academic research, runs a live spoken interview, and produces feedback grounded in the candidate's transcript.
 
-The current interface requires **Google sign-in through Supabase OAuth** and uses live voice conversation. Questions cover technical explanations, behavioral experiences, and system design. Coding exercises, code editors, compilers, and code execution are outside the product scope.
+The front page, company interview guides, and future research roadmaps are public. Starting an interview requires **Google sign-in through Supabase OAuth** and uses live voice conversation. Questions cover technical explanations, behavioral experiences, and system design. Coding exercises, code editors, compilers, and code execution are outside the product scope.
 
 Company names provide practice context. Generated questions are not verified company interview questions, and neither forecast rankings nor coaching scores are validated hiring probabilities.
 
 ## Current interview experience
 
-1. Sign in with Google. There is no guest entry or email-account preview.
-2. Select a company, Software Engineer role, and interview mode. The catalog currently includes Google, ZipRecruiter, OpenAI, Anthropic, NVIDIA, and Microsoft.
+1. Explore the public company interview guides and future research roadmaps. Google sign-in is required when starting an interview.
+2. Select a company, Software Engineer role, and interview mode. The catalog currently includes Google, Microsoft, NVIDIA, Monzo, GitLab, ZipRecruiter, OpenAI, and Anthropic.
 3. Consent to live audio processing and start an interview. The backend retrieves saved research, generates the first question with Claude, and persists the session before returning it.
 4. Connect live audio and allow microphone access. The browser streams audio directly to OpenAI over WebRTC using a temporary credential issued by the backend.
 5. Answer naturally. Transcripts are submitted automatically; Claude distinguishes answers, clarification requests, repeats, and control requests. Interviewer speech is interruptible, and the UI supports mute, disconnect, reconnect, repeat, and end controls.
@@ -127,7 +127,7 @@ Claude interprets utterances, clarifies wording, generates questions, and assess
 
 ### Authentication and privacy
 
-The OAuth flow uses server-side `@supabase/ssr` clients and PKCE. Supabase session cookies are HttpOnly, SameSite=Lax, and Secure on HTTPS. Proxy refreshes/verifies Auth sessions and redirects guests away from setup, interview, and results pages. Private APIs independently verify the user with `auth.getUser()`.
+The OAuth flow uses server-side `@supabase/ssr` clients and PKCE. Supabase session cookies are HttpOnly, SameSite=Lax, and Secure on HTTPS. The front page and catalog are public and do not depend on Auth availability. Proxy refreshes/verifies Auth sessions and redirects guests away from private interview and results pages. Private APIs independently verify the user with `auth.getUser()`.
 
 Each private interview request requires both the **signed-in owner** and its **interview capability token** in `Authorization: Bearer <sessionToken>`. The backend derives ownership from the verified user, stores only the capability's SHA-256 hash, and rejects client-supplied ownership. The original capability is returned once and kept in tab-local storage. A session ID or stolen capability alone grants no access to another account's interview.
 
