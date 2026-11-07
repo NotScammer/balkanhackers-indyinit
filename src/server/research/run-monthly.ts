@@ -6,6 +6,9 @@ import { SupabaseDatabase } from '../storage/supabase';
 import { collectArxiv, collectOpenAlex, deduplicatePapers } from './academic';
 import { collectIndustry, MONITORED_COMPANIES, TavilySearch } from './industry';
 import { normalizeConcept, rankHypothesis } from './forecasting';
+import { refreshSavedForecasts } from './forecasting/refresh';
+import { CachedTopicTrends } from './trends/cache';
+import { SerpApiTrends } from './trends/provider';
 import { analysisSchema, hypothesesSchema, screeningSchema, signalBatchSchema } from './schemas';
 import { pageText, SourceReader } from './http';
 import { ResearchStorage } from './storage';
@@ -18,13 +21,26 @@ export async function runMonthly(db = new SupabaseDatabase(), ai: StructuredAI =
   const signal = AbortSignal.timeout(config.RESEARCH_DEADLINE_SECONDS * 1000);
   const deadline = Date.now() + config.RESEARCH_DEADLINE_SECONDS * 1000;
   const reader = new SourceReader(signal);
-  const errors: string[] = []; const counts = { industrySources: 0, industrySignals: 0, papers: 0, screened: 0, analysed: 0, fulltext: 0, forecasts: 0 };
+  const errors: string[] = []; const counts = { industrySources: 0, industrySignals: 0, papers: 0, screened: 0, analysed: 0, fulltext: 0, forecasts: 0, trendsFetched: 0, trendsCached: 0, trendsUnavailable: 0, refreshedForecasts: 0 };
   const recordError = (error: unknown) => {
     // No URLs with API keys, external response bodies, transcripts, or raw error dumps are recorded.
     const code = error instanceof AppError ? error.code : 'RESEARCH_STAGE_FAILED';
     errors.push(code); console.warn(JSON.stringify({ event: 'research_stage_failed', runId: run.id, code }));
   };
-  const hasBudget = () => !signal.aborted && Date.now() < deadline - 30000;
+  const hasBudget = () => !signal.aborted && Date.now() < deadline - 60000;
+  const canSaveTrends = () => !signal.aborted && Date.now() < deadline - 15000;
+  const trends = new CachedTopicTrends(db, config.SERPAPI_API_KEY ? new SerpApiTrends(config.SERPAPI_API_KEY) : null,
+    config.GOOGLE_TRENDS_GEO, signal, deadline);
+  const topics = new Set<string>();
+  const trendFor = async (topic: string) => {
+    const result = await trends.lookup(topic);
+    if (result.fetched) counts.trendsFetched++;
+    if (result.cacheHit) counts.trendsCached++;
+    if (result.assessment.status !== 'available') counts.trendsUnavailable++;
+    const code = result.assessment.reasonCode;
+    if (code && ['TRENDS_NOT_CONFIGURED','TRENDS_UNAVAILABLE','TRENDS_BUDGET_EXHAUSTED'].includes(code) && !errors.includes(code)) errors.push(code);
+    return result.assessment;
+  };
   const window = { start: run.window_start, end: run.window_end };
   const evidence: EvidenceInput[] = [];
   try {
@@ -83,22 +99,25 @@ export async function runMonthly(db = new SupabaseDatabase(), ai: StructuredAI =
     }
     if (evidence.length && hasBudget()) {
       try {
-        const output = await ai.generate(hypothesesSchema, 'Group related normalized technical concepts into emerging competency hypotheses, connecting industry and academia when supported. Allow industry-only or academic-only hypotheses. Use only supplied source IDs and summaries; include contradictory evidence when present. Do not invent citations, dates, funding figures or results. Distinguish preparation priority from evidence confidence and hiring probability. roleRelevance 0-100 means fit to software engineering work; technicalMaturity 0-100 means evidence of practical applicability (0 speculative, 50 prototype, 100 operationally established). These are provisional heuristics. Avoid duplicate topics.', evidence.map(e => ({ sourceId: e.source.id, sourceType: e.source.sourceType, publisher: e.source.publisher, date: e.source.publishedAt, concepts: e.concepts, findings: e.description, limitations: e.limitations })), signal);
-        const topics = new Set<string>();
+        const output = await ai.generate(hypothesesSchema, 'Group related normalized technical concepts into emerging competency hypotheses, connecting industry and academia when supported. Allow industry-only or academic-only hypotheses. Use only supplied source IDs and summaries; include contradictory evidence when present. Do not invent citations, dates, funding figures or results. Distinguish preparation priority from evidence confidence and hiring probability. roleRelevance 0-100 means fit to software engineering work; technicalMaturity 0-100 means evidence of practical applicability (0 speculative, 50 prototype, 100 operationally established). These are provisional heuristics. Use concise topic names suitable as single Google Trends search terms, not comma-separated comparison lists. Never invent search-interest measurements. Avoid duplicate topics.', evidence.map(e => ({ sourceId: e.source.id, sourceType: e.source.sourceType, publisher: e.source.publisher, date: e.source.publishedAt, concepts: e.concepts, findings: e.description, limitations: e.limitations })), signal);
         for (const hypothesis of output.forecasts) {
-          if (topics.has(normalizeConcept(hypothesis.topic))) continue;
+          if (topics.has(normalizeConcept(hypothesis.topic)) || !canSaveTrends()) continue;
           try {
-            const ranking = rankHypothesis(hypothesis, evidence);
+            const ranking = rankHypothesis(hypothesis, evidence, await trendFor(hypothesis.topic));
             await db.rpc('save_forecast', { p_run_id: run.id, p_forecast: { ...hypothesis, ...ranking, rubricVersion: FORECAST_RUBRIC, dataMode: 'verified' }, p_evidence: hypothesis.evidence.map(e => ({ ...e, relationshipType: evidence.find(item => item.source.id === e.sourceId)!.source.sourceType })) });
             topics.add(normalizeConcept(hypothesis.topic)); counts.forecasts++;
           } catch (e) { recordError(e); }
         }
       } catch (e) { recordError(e); }
     } else errors.push(hasBudget() ? 'NO_USABLE_EVIDENCE' : 'RESEARCH_BUDGET_EXHAUSTED');
+    if (canSaveTrends()) {
+      counts.refreshedForecasts = await refreshSavedForecasts(db, store, trendFor, topics, run.id, canSaveTrends, recordError);
+      counts.forecasts += counts.refreshedForecasts;
+    }
   } catch (e) { recordError(e); }
   if (signal.aborted && !errors.includes('RESEARCH_BUDGET_EXHAUSTED')) errors.push('RESEARCH_BUDGET_EXHAUSTED');
   if (counts.forecasts === 0) errors.push('NO_FORECASTS_SAVED');
-  const status = errors.length ? counts.industrySources + counts.papers > 0 ? 'partial' : 'failed' : 'succeeded';
+  const status = errors.length ? counts.industrySources + counts.papers + counts.forecasts > 0 ? 'partial' : 'failed' : 'succeeded';
   await store.finish(run.id, status, counts, errors);
   return { runId: run.id, status, counts, errors };
 }

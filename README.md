@@ -54,6 +54,8 @@ Fill `.env.local`, configure OAuth, and apply the database migrations before sta
 | `CRON_SECRET`                                                           | Separate secret protecting scheduled/manual research                                                 |
 | `TAVILY_API_KEY`                                                        | Optional targeted industry search                                                                    |
 | `OPENALEX_API_KEY`                                                      | Optional OpenAlex academic discovery                                                                 |
+| `SERPAPI_API_KEY`                                                       | Monthly Google Trends interest-over-time lookup through SerpApi                                      |
+| `GOOGLE_TRENDS_GEO`                                                     | Trends geography; blank means worldwide, `US` limits to the United States                            |
 | `RESEARCH_DATA_MODE`                                                    | `verified` by default; deliberately set `illustrative` only for labeled fixtures                     |
 | `RESEARCH_CONTACT_EMAIL`                                                | Optional contact email in research requests                                                          |
 | `RESEARCH_DEADLINE_SECONDS`                                             | Monthly run deadline, default 210 seconds, configurable from 30 to 210                               |
@@ -76,14 +78,17 @@ Google returns to Supabase, and Supabase returns to the app. These two callback 
 
 ### Database migrations
 
-Apply all four files **in order**, using the Supabase SQL Editor or the CLI instructions in [docs/SETUP.md](docs/SETUP.md):
+Apply all five files **in order**, using the Supabase SQL Editor or the CLI instructions in [docs/SETUP.md](docs/SETUP.md):
 
 1. [001 — core research/interview schema](supabase/migrations/202611070001_backend.sql)
 2. [002 — atomic forecast persistence](supabase/migrations/202611070002_research_persistence.sql)
 3. [003 — live conversation state and idempotency](supabase/migrations/202611070003_live_conversation.sql)
 4. [004 — OAuth ownership](supabase/migrations/202611070004_oauth_ownership.sql)
+5. [005 — monthly topic-interest cache and age-independent forecast ranking](supabase/migrations/202611070005_topic_trends.sql)
 
 Migration 004 references Supabase's `auth.users`, adds interview ownership, and requires owners for new interviews. Existing anonymous records are preserved but are inaccessible through the OAuth API; they are not claimed by the next person to sign in. Coordinate migration 004 with deployment because older app versions can no longer create ownerless interviews.
+
+Migration 005 preserves historical forecasts and appends new versions of the latest v1 forecasts with their age penalty removed. These versions explicitly say Trends has not yet been checked. Deploy this backend with migration 005 applied; an actual monthly scan populates measured interest.
 
 Starting Next.js does not apply migrations or load seed data. No hosted migration success is implied by the local automated tests.
 
@@ -134,11 +139,15 @@ Accounts do not currently add cross-device history or recovery of lost interview
 
 There is no production question bank. Question generation retrieves role-relevant, evidence-backed forecasts from Supabase, chooses an unused topic where possible, and supplies its saved evidence to Claude. Technical/design questions must reference the selected forecast and valid supporting evidence IDs. Saved questions include their wording, model version, provenance, and private assessment guidance.
 
-**Monthly research is cached durably in PostgreSQL.** Every question reads saved forecasts and citations; it does not call Tavily, arXiv, OpenAlex, or article retrieval. Cached research is shared across sessions and server instances and remains usable until later research or explicit seeding writes newer versions. Existing questions retain their original snapshots. Company selection supplies question-generation context; forecast retrieval currently filters by role and data mode rather than a company-specific prediction model.
+**Monthly research is cached durably in PostgreSQL.** Every question reads saved forecasts and citations; it does not call Tavily, arXiv, OpenAlex, Google Trends, or article retrieval. Cached research is shared across sessions and server instances and remains usable until later research or explicit seeding writes newer versions. Existing questions retain their original snapshots. Company selection supplies question-generation context; forecast retrieval currently filters by role and data mode rather than a company-specific prediction model.
 
 The monthly pipeline monitors OpenAI, Anthropic, and NVIDIA using official sources and optional Tavily search. Academic discovery uses arXiv and optional OpenAlex, deduplicates stable identifiers, screens abstracts, and selectively analyzes accessible arXiv HTML. Restricted/PDF-only sources fall back to explicitly labeled abstract-only analysis; PDF extraction is not implemented. Access rules, dates, reference validation, request limits, and an execution deadline constrain collection.
 
-Forecast priority combines industry momentum (25%), academic momentum (20%), role relevance (30%), technical maturity (15%), and recency (10%). Evidence confidence is a separate label. These are provisional preparation heuristics, not calibrated probabilities. AI interpretation and valid citation IDs still require human review for factual quality.
+Forecast priority combines industry momentum (25%), academic momentum (20%), role relevance (30%), technical maturity (15%), and **topic relevance from Google Trends (10%)**, versioned as `preparation-v2-trends`. Publication age does not reduce the score. The monthly job requests a five-year series for the topic through SerpApi and compares the latest complete 12 months with the preceding 12 months. Stable/rising interest gets 100; a decline beyond a 5% noise allowance gets the percentage of interest retained (80 → 40 means 50). This component contributes up to 10 preparation-priority points.
+
+Trends measurements, query, geography, comparison windows, raw interest points, and scoring method are cached in `topic_trend_snapshots` per calendar month. Each forecast saves its applied assessment in `trend_snapshot`. At most eight external lookups run per scan; saved topics can be refreshed using their existing evidence, including older papers. Missing/insufficient data is explicitly unknown and incurs no age penalty; a previous measured score is retained as stale when available. Configure `SERPAPI_API_KEY` for actual lookups. See [topic-interest scoring and cache details](docs/TOPIC_TRENDS.md).
+
+Evidence confidence remains separate. Search interest measures attention, not technical quality or employer demand. These are provisional preparation heuristics, not calibrated probabilities. AI interpretation and valid citation IDs still require human review for factual quality.
 
 ### Evaluation and scoring
 
@@ -166,6 +175,7 @@ In live mode, each main question's initial answer, follow-ups, and continuations
 | ------------------------------------------------------------------------------------------ | ---------------------------------------------- |
 | Users and Google identities                                                                | Supabase Auth                                  |
 | Research sources, paper metadata/analyses, signals, forecasts, citation links, run metrics | Research tables in Supabase PostgreSQL         |
+| Monthly Google Trends series and assessments; applied forecast assessment                  | `topic_trend_snapshots`; `topic_forecasts.trend_snapshot` |
 | Session owner, hashed capability, settings, consent, expiry, status                        | `interview_sessions`                           |
 | Initial question and legacy turn questions                                                 | `session_questions`                            |
 | Subsequent live questions, transcript groups, messages, private evaluations, revision      | `live_interviews.state` JSON                   |
@@ -224,7 +234,7 @@ Application errors use `{ error: { code, message, retryable, requestId } }`. Exa
 | `npm run smoke`         | Production HTTP/PKCE check against a local mock Auth authority; run after building |
 | `npm run seed`          | Load initial source-backed preparation hypotheses                                  |
 
-Last code verification passed **110 tests: 22 frontend and 88 backend**, plus typecheck, lint, production build, and the HTTP smoke check. Database tests execute the migrations in embedded PostgreSQL with an emulated `auth.users` reference. Provider calls are mocked; the smoke check exercises the actual Supabase SSR SDK, PKCE exchange, cookies, sign-out, guest gating, Origin checks, and cron authorization against a local mock service.
+Last code verification passed **136 tests: 22 frontend and 114 backend**, plus typecheck, lint, production build, and the HTTP smoke check. Database tests execute the migrations in embedded PostgreSQL with an emulated `auth.users` reference. Provider calls are mocked; the smoke check exercises the actual Supabase SSR SDK, PKCE exchange, cookies, sign-out, guest gating, Origin checks, and cron authorization against a local mock service. Trends tests cover retained/declining interest, absence of publication-age penalties, monthly reuse, stale fallback, provider validation, saved-topic refresh, migration history and server-only grants.
 
 These checks do not establish real Google consent, hosted migration success, live model access, microphone quality, or deployed scheduling. Before the demo, apply migrations, configure Google/Supabase callbacks and model credentials, load verified research, and rehearse a complete spoken session on the deployed browser. Test interruption, clarification, transcript correction, reconnect, cross-account denial, report updates, and deletion.
 
@@ -281,6 +291,7 @@ Contributors and coding assistants should read `AGENTS.md`, inspect the current 
 - [Current live voice behavior, payloads, and persistence](docs/LIVE_INTERVIEW.md)
 - [Database setup, keys, seeding, and deployment](docs/SETUP.md)
 - [Backend architecture and legacy turn processor](docs/BACKEND_ARCHITECTURE.md)
+- [Google Trends topic relevance, monthly caching, and migration](docs/TOPIC_TRENDS.md)
 - [Frontend/compatibility endpoint contracts](docs/FRONTEND_INTEGRATION.md)
 - [Frontend implementation notes](FRONTEND.md)
 - [Archived original MVP specification](docs/archive/ORIGINAL_MVP.md) — historical plans and original question/rubric examples, not the active contract

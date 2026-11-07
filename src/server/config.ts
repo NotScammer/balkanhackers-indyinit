@@ -7,6 +7,8 @@ const envSchema = z.object({
   OPENAI_TTS_MODEL: z.string().optional(), OPENAI_TTS_VOICE: z.string().default('alloy'),
   OPENAI_API_KEY: z.string().optional(), OPENAI_REALTIME_MODEL: z.string().optional(), OPENAI_TRANSCRIPTION_MODEL: z.string().optional(),
   TAVILY_API_KEY: z.string().optional(), OPENALEX_API_KEY: z.string().optional(),
+  SERPAPI_API_KEY: z.string().optional(),
+  GOOGLE_TRENDS_GEO: z.string().regex(/^(?:[A-Z]{2}(?:-[A-Z0-9]{1,3})?)?$/).default(''),
   CRON_SECRET: z.preprocess(v => v === '' ? undefined : v, z.string().min(32).optional()), RATE_LIMIT_SALT: z.string().min(32),
   RESEARCH_DATA_MODE: z.enum(['verified', 'illustrative']).default('verified'),
   RESEARCH_DEADLINE_SECONDS: z.coerce.number().int().min(30).max(210).default(210),
@@ -16,8 +18,8 @@ const envSchema = z.object({
 export function env() { const result = envSchema.safeParse(process.env); if (!result.success) throw new AppError('NOT_CONFIGURED', 503, 'Backend environment is missing or invalid. See .env.example and docs/SETUP.md.'); return result.data; }
 export const INTERVIEW = { turns: 3, maxFollowUpDepth: 1, expiryHours: 24, leaseSeconds: 180, maxProcessingAttempts: 4 } as const;
 export const SCORE_WEIGHTS = { content: 0.60, structure: 0.25, relevance: 0.15 } as const;
-export const FORECAST_WEIGHTS = { industryMomentum: 0.25, academicMomentum: 0.20, roleRelevance: 0.30, technicalMaturity: 0.15, recency: 0.10 } as const;
-export const FORECAST_RUBRIC = 'preparation-v1';
+export const FORECAST_WEIGHTS = { industryMomentum: 0.25, academicMomentum: 0.20, roleRelevance: 0.30, technicalMaturity: 0.15, topicRelevance: 0.10 } as const;
+export const FORECAST_RUBRIC = 'preparation-v2-trends';
 export const RUBRICS = {
   behavioral: { version: 'behavioral-v1', content: 'Specific personal actions, outcomes and reflection. STAR is optional; never infer honesty or fabricate outcomes.', structure: 'Clear context, action and result in any coherent order.', relevance: 'Evidence of the role competency being asked.' },
   technical: { version: 'technical-v1', content: 'Correct mechanisms, causal and diagnostic reasoning, alternatives and limitations; no code needed.', structure: 'Assumptions, ordered reasoning and conclusion.', relevance: 'Address this scenario and role constraints; accept correct alternatives.' },

@@ -65,6 +65,20 @@ describe('scoring and validation', () => {
 });
 
 describe('authorized durable three-turn flow', () => {
+  it('reads saved research for every question across turns and sessions without new research or Trends calls', async () => {
+    const fetcher = vi.fn().mockRejectedValue(new Error('Unexpected external research request'));
+    vi.stubGlobal('fetch', fetcher);
+    const reads = vi.spyOn(db, 'forecasts');
+    try {
+      const s = await create('mixed'); let questionId = s.currentTurn!.question.id;
+      for (let turn = 0; turn < 3; turn++) {
+        const response = await submit(s, answer(s, questionId)); expect(response.status).toBe(200);
+        const result = await response.json(); if (result.nextTurn) questionId = result.nextTurn.question.id;
+      }
+      await create();
+      expect(reads).toHaveBeenCalledTimes(4); expect(fetcher).not.toHaveBeenCalled();
+    } finally { vi.unstubAllGlobals(); reads.mockRestore(); }
+  });
   it('rejects missing, wrong, another-session and expired credentials', async () => {
     const s = await create(); const other = await create();
     expect((await api.get(request(), s.sessionId)).status).toBe(401);

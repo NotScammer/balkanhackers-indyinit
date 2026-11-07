@@ -65,7 +65,7 @@ describe('academic adapters and source safety', () => {
 
 describe('forecast ranking', () => {
   it('calculates the versioned preparation weights independently of confidence', () => {
-    expect(forecastScore({ industryMomentum: 100, academicMomentum: 50, roleRelevance: 80, technicalMaturity: 60, recency: 90 })).toBe(77);
+    expect(forecastScore({ industryMomentum: 100, academicMomentum: 50, roleRelevance: 80, technicalMaturity: 60, topicRelevance: 90 })).toBe(77);
     expect(normalizeConcept('  KV-Cache  ')).toBe('kv cache');
     const evidence: EvidenceInput[] = [{ source: source(), concepts: ['efficiency'], description: 'Fixture only', limitations: [] }];
     const hypothesis = { topic: 'Efficiency', explanation: 'Test hypothesis', predictedSkills: ['memory'], targetRoles: ['software-engineer' as const], timeHorizonMonths: 12, roleRelevance: 90, technicalMaturity: 50, evidence: [{ sourceId: evidence[0].source.id, stance: 'support' as const, explanation: 'Synthetic relation' }] };

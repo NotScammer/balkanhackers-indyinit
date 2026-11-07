@@ -5,7 +5,7 @@ import { databaseError } from '../src/server/errors';
 import { testUser, otherUser } from './identity';
 export class TestDatabase implements Database {
   constructor(public sql: PGlite) {}
-  static async create() {
+  static async create(beforeTopicTrends?: (sql: PGlite) => Promise<void>) {
     const sql = new PGlite();
     await sql.exec('create role anon; create role authenticated; create role service_role bypassrls;');
     await sql.exec(await readFile('supabase/migrations/202611070001_backend.sql', 'utf8'));
@@ -15,6 +15,8 @@ export class TestDatabase implements Database {
     await sql.exec('create schema auth; create table auth.users(id uuid primary key);');
     await sql.query('insert into auth.users(id) values($1),($2)', [testUser.id, otherUser.id]);
     await sql.exec(await readFile('supabase/migrations/202611070004_oauth_ownership.sql', 'utf8'));
+    await beforeTopicTrends?.(sql);
+    await sql.exec(await readFile('supabase/migrations/202611070005_topic_trends.sql', 'utf8'));
     return new TestDatabase(sql);
   }
   async rpc<T>(name: string, args: Record<string, unknown> = {}): Promise<T> {

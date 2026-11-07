@@ -28,6 +28,8 @@ The catalog remains public. Setup, interview and results pages require Google si
 | `OPENAI_TRANSCRIPTION_MODEL` | Supported input transcription model from the [Realtime reference](https://developers.openai.com/api/reference/resources/realtime/subresources/client_secrets/methods/create); explicit account-supported ID required |
 | `TAVILY_API_KEY` | [Tavily dashboard](https://app.tavily.com/); optional targeted industry search; official sources still run without it |
 | `OPENALEX_API_KEY` | [OpenAlex settings](https://openalex.org/settings/api); optional OpenAlex branch; arXiv still runs without it |
+| `SERPAPI_API_KEY` | [SerpApi](https://serpapi.com/google-trends-api) key for monthly Google Trends measurements; missing data is labeled, never replaced with age decay |
+| `GOOGLE_TRENDS_GEO` | Blank for worldwide, or a Google Trends geography such as `US`; changes use separate cache entries |
 | `CRON_SECRET` | Generate random 32+ character secret; required for the monthly/manual research endpoint |
 | `RATE_LIMIT_SALT` | Independent random 32+ character secret; required to hash IP rate keys |
 | `RESEARCH_DATA_MODE` | `verified` by default; deliberately set `illustrative` for synthetic fixtures |
@@ -49,7 +51,8 @@ SQL Editor method:
 3. Run **all** of `supabase/migrations/202611070002_research_persistence.sql` once.
 4. Run **all** of `supabase/migrations/202611070003_live_conversation.sql` once.
 5. Run **all** of `supabase/migrations/202611070004_oauth_ownership.sql` once.
-6. Confirm all four transactions succeeded. Run the read-only verification queries below.
+6. Run **all** of `supabase/migrations/202611070005_topic_trends.sql` once.
+7. Confirm all five transactions succeeded. Run the read-only verification queries below. Migration 005 adds the monthly Trends cache and appends age-independent forecast versions; see [TOPIC_TRENDS.md](TOPIC_TRENDS.md).
 
 Supabase CLI method (install the CLI separately using its official instructions):
 
@@ -143,7 +146,7 @@ Immediate access expiry is implemented. Eventual cleanup runs at the beginning o
 
 ## Live-account walkthrough remaining
 
-- [ ] Apply/verify all four hosted migrations and server role grants.
+- [ ] Apply/verify all five hosted migrations and server role grants.
 - [ ] Load actual metadata through the verified seed; confirm `dataMode: verified` in creation.
 - [ ] Complete three typed turns using live Claude, check persisted questions/evaluations and final arithmetic.
 - [ ] Retry one successful answer with the same payload; confirm unchanged result and no additional model call.
