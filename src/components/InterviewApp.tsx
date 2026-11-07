@@ -1,95 +1,14 @@
 "use client";
-import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+import { api, tokenKey } from "../lib/client/api";
+import { useInterview } from "../hooks/useInterview";
+import { useRecorder } from "../hooks/useRecorder";
+import { modes, remainingSeconds } from "../lib/client/interview-model";
 import NotebookShell from "./NotebookShell";
+import SetupView from "./SetupView";
+import { AnswerFeedback, ReportView } from "./FeedbackView";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { api, isMock, RequestError, tokenKey } from "../lib/client/api";
-import type {
-  AnswerResult,
-  Catalog,
-  InterviewMode,
-  Session,
-  SessionReport,
-  Submission,
-  Submitted,
-} from "../lib/client/contracts";
-const modes: Record<
-  InterviewMode,
-  { title: string; description: string; limit: string }
-> = {
-  behavioral: {
-    title: "Behavioral",
-    description:
-      "Tell your story. Reflect on actions, collaboration, and outcomes.",
-    limit: "3 minutes",
-  },
-  technical: {
-    title: "Technical",
-    description:
-      "Explain mechanisms, investigate problems, and weigh alternatives.",
-    limit: "5 minutes",
-  },
-  system_design: {
-    title: "System design",
-    description:
-      "Shape a small system. Connect requirements, components, and trade-offs.",
-    limit: "10 minutes",
-  },
-  mixed: {
-    title: "Mixed",
-    description:
-      "One behavioral, one technical, and one system design question.",
-    limit: "3 / 5 / 10 minutes",
-  },
-};
-function Feedback({ answer }: { answer: AnswerResult }) {
-  const e = answer.evaluation;
-  return (
-    <div className="feedback">
-      <div className="scoreline">
-        <h3>Question feedback</h3>
-        <strong>
-          {e.overallScore}
-          <small> / 100</small>
-        </strong>
-      </div>
-      <div className="metrics">
-        {Object.entries(e.scores).map(([k, v]) => (
-          <span key={k}>
-            {k} <b>{v}</b>
-          </span>
-        ))}
-      </div>
-      <h4>Strengths</h4>
-      <ul>
-        {e.strengths.map((s, i) => (
-          <li key={i}>{s}</li>
-        ))}
-      </ul>
-      <h4>Try next time</h4>
-      <ul>
-        {e.improvements.map((s, i) => (
-          <li key={i}>{s}</li>
-        ))}
-      </ul>
-      {e.evidence.map((v, i) => (
-        <blockquote key={i}>
-          “{v.quote}”<p>{v.explanation}</p>
-        </blockquote>
-      ))}
-      <h4>A useful answer outline</h4>
-      <ol>
-        {e.suggestedAnswerOutline.map((s, i) => (
-          <li key={i}>{s}</li>
-        ))}
-      </ol>
-      <details>
-        <summary>Your submitted answer</summary>
-        <p className="transcript">{answer.transcript}</p>
-      </details>
-    </div>
-  );
-}
 export default function InterviewApp({
   sessionId,
   results = false,
@@ -97,705 +16,425 @@ export default function InterviewApp({
   sessionId?: string;
   results?: boolean;
 }) {
-  const router = useRouter();
-  const [pending, setPending] = useState<Submission | null>(null),
-    [audioBlob, setAudioBlob] = useState<Blob | null>(null),
-    [audioConsent, setAudioConsent] = useState(false);
-  const [catalog, setCatalog] = useState<Catalog | null>(null),
-    [company, setCompany] = useState(""),
-    [role, setRole] = useState(""),
-    [round, setRound] = useState<InterviewMode>("behavioral"),
-    [consent, setConsent] = useState(false);
-  const [session, setSession] = useState<Session | null>(null),
-    [report, setReport] = useState<SessionReport | null>(null),
-    [feedback, setFeedback] = useState<Submitted | null>(null);
-  const [mode, setMode] = useState<"voice" | "text">("voice"),
-    [draft, setDraft] = useState(""),
-    [confirmed, setConfirmed] = useState(false),
-    [duration, setDuration] = useState<number | null>(null),
-    [recording, setRecording] = useState(false),
-    [elapsed, setElapsed] = useState(0),
-    [busy, setBusy] = useState(""),
-    [error, setError] = useState(""),
-    [playing, setPlaying] = useState(false),
-    [retryAt, setRetryAt] = useState(0);
-  const lock = useRef(false),
-    recorder = useRef<MediaRecorder | null>(null),
-    stream = useRef<MediaStream | null>(null),
-    timer = useRef<ReturnType<typeof setInterval> | null>(null),
-    audio = useRef<HTMLAudioElement | null>(null),
-    audioUrl = useRef<string | null>(null),
-    cancelled = useRef(false),
-    alive = useRef(true);
-  const stopPlayback = useCallback(() => {
-    audio.current?.pause();
-    if (audioUrl.current) URL.revokeObjectURL(audioUrl.current);
-    audioUrl.current = null;
-    audio.current = null;
+  return sessionId ? (
+    <InterviewRoom
+      key={`${sessionId}:${results}`}
+      id={sessionId}
+      results={results}
+    />
+  ) : (
+    <NotebookShell>
+      <SetupView />
+    </NotebookShell>
+  );
+}
+function InterviewRoom({ id, results }: { id: string; results: boolean }) {
+  const router = useRouter(),
+    {
+      state: s,
+      dispatch,
+      question: q,
+      run,
+      load,
+      submit,
+    } = useInterview(id, results),
+    mic = useRecorder();
+  const [playing, setPlaying] = useState(false),
+    [recordingReview, setRecordingReview] = useState(false),
+    [transcribed, setTranscribed] = useState(false);
+  const playback = useRef<HTMLAudioElement | null>(null),
+    playUrl = useRef<string | null>(null),
+    heading = useRef<HTMLHeadingElement | null>(null),
+    localAudio = useRef<HTMLAudioElement | null>(null);
+  const [welcome, setWelcome] = useState(true);
+  const isRecording = mic.stage === "recording",
+    audioBusy = isRecording || mic.stage === "opening microphone";
+  const disabled = !!s.busy || audioBusy;
+  const phase = s.feedback
+    ? "feedback"
+    : s.busy
+      ? s.phase
+      : isRecording
+        ? "recording"
+        : recordingReview
+          ? "reviewing recording"
+          : playing
+            ? "playing question"
+            : s.phase;
+  const stopPlayback = () => {
+    playback.current?.pause();
+    if (playUrl.current) URL.revokeObjectURL(playUrl.current);
+    playback.current = null;
+    playUrl.current = null;
     setPlaying(false);
-  }, []);
-  const task = useCallback(async (label: string, fn: () => Promise<void>) => {
-    if (lock.current) return;
-    lock.current = true;
-    setBusy(label);
-    setError("");
-    try {
-      await fn();
-    } catch (e) {
-      setError(
-        e instanceof DOMException && e.name === "NotAllowedError"
-          ? "Microphone permission was denied. Switch to a typed answer to continue."
-          : e instanceof Error
-            ? e.message
-            : "Something went wrong. Please retry.",
-      );
-      if (e instanceof RequestError && e.retryAfter)
-        setRetryAt(Date.now() + e.retryAfter);
-    } finally {
-      lock.current = false;
-      if (alive.current) setBusy("");
-    }
-  }, []);
-  const load = useCallback(
-    () =>
-      task("Loading", async () => {
-        if (sessionId) {
-          const s = await api.session(sessionId);
-          setSession(s);
-          setFeedback(null);
-          setAudioConsent(
-            sessionStorage.getItem(`consent:${sessionId}`) === "true",
-          );
-          const raw =
-            s.currentTurn &&
-            sessionStorage.getItem(
-              `draft:${sessionId}:${s.currentTurn.question.id}`,
-            );
-          setPending(null);
-          setAudioBlob(null);
-          if (raw) {
-            try {
-              const d = JSON.parse(raw);
-              setDraft(d.text ?? "");
-              setMode(d.mode ?? "voice");
-              setDuration(d.duration ?? null);
-              setPending(d.pending ?? null);
-            } catch {
-              setDraft("");
-            }
-          } else {
-            setDraft("");
-            setDuration(null);
-          }
-          setConfirmed(false);
-          if (s.status === "completed") {
-            setReport(await api.report(sessionId));
-          } else if (results) {
-            setError(
-              "This interview is still in progress. Return to the interview to finish.",
-            );
-          }
-        } else {
-          const c = await api.catalog();
-          setCatalog(c);
-          const first = c.availableInterviews[0];
-          if (first) {
-            setCompany(first.companyId);
-            setRole(first.roleId);
-            setRound(first.round);
-            const saved = sessionStorage.getItem("rehearsal:setup");
-            if (saved) {
-              try {
-                const d = JSON.parse(saved);
-                if (
-                  c.availableInterviews.some(
-                    (a) =>
-                      a.companyId === d.companyId &&
-                      a.roleId === d.roleId &&
-                      a.round === d.round,
-                  )
-                ) {
-                  setCompany(d.companyId);
-                  setRole(d.roleId);
-                  setRound(d.round);
-                  setConsent(d.audioProcessingConsent === true);
-                }
-              } catch {}
-            }
-          }
-        }
-      }),
-    [sessionId, results, task],
+  };
+  useEffect(
+    () => () => {
+      playback.current?.pause();
+      if (playUrl.current) URL.revokeObjectURL(playUrl.current);
+    },
+    [],
   );
   useEffect(() => {
-    alive.current = true;
-    const loading = setTimeout(() => void load(), 0);
-    return () => {
-      clearTimeout(loading);
-      alive.current = false;
-      cancelled.current = true;
-      if (recorder.current?.state === "recording") recorder.current.stop();
-      stream.current?.getTracks().forEach((t) => t.stop());
-      if (timer.current) clearInterval(timer.current);
-      audio.current?.pause();
-      if (audioUrl.current) URL.revokeObjectURL(audioUrl.current);
-    };
-  }, [load]);
-  const q = session?.currentTurn?.question;
-  useEffect(() => {
-    if (!sessionId || !q || feedback) return;
-    sessionStorage.setItem(
-      `draft:${sessionId}:${q.id}`,
-      JSON.stringify({ text: draft, mode, duration, pending: pending }),
-    );
-  }, [draft, mode, duration, pending, sessionId, q, feedback]);
-  async function start() {
-    await task("Creating your interview", async () => {
-      sessionStorage.setItem(
-        "rehearsal:setup",
-        JSON.stringify({
-          companyId: company,
-          roleId: role,
-          round,
-          audioProcessingConsent: consent,
-        }),
-      );
-      const s = await api.create({
-        companyId: company,
-        roleId: role,
-        round,
-        audioProcessingConsent: consent,
-      });
-      sessionStorage.setItem(tokenKey(s.sessionId), s.sessionToken);
-      sessionStorage.setItem(`consent:${s.sessionId}`, String(consent));
-      router.push(`/interview/${s.sessionId}`);
-    });
-  }
+    heading.current?.focus();
+  }, [q?.id, s.feedback?.answer.answerId, s.report?.sessionId]);
   async function play() {
-    if (!q || !sessionId) return;
+    if (!q) return;
+    localAudio.current?.pause();
     stopPlayback();
-    await task("Preparing question audio", async () => {
-      const b = await api.speech(sessionId, q.id);
-      audioUrl.current = URL.createObjectURL(b);
-      const a = new Audio(audioUrl.current);
-      audio.current = a;
+    await run("Preparing question audio", async () => {
+      const b = await api.speech(id, q.id);
+      playUrl.current = URL.createObjectURL(b);
+      const a = new Audio(playUrl.current);
+      playback.current = a;
       a.onended = stopPlayback;
       a.onerror = () => {
         stopPlayback();
-        setError(
-          "Question audio could not play. You can read the question and continue.",
-        );
+        dispatch({
+          type: "failure",
+          message:
+            "Question audio could not play. Read the question and continue.",
+        });
       };
-      await a.play();
-      setPlaying(true);
-    });
-  }
-  async function transcribe(b: Blob) {
-    if (!sessionId || !q) return;
-    await task("Transcribing — your answer is not submitted", async () => {
-      if (b.size > 25 * 1024 * 1024)
+      try {
+        await a.play();
+        setPlaying(true);
+      } catch {
+        stopPlayback();
         throw Error(
-          "Recording exceeds 25 MB. Record a shorter answer or switch to typing.",
+          "Question audio could not play. Read the question and continue.",
         );
-      const r = await api.transcribe(sessionId, q.id, b);
-      if (alive.current) {
-        setDraft(r.transcript);
-        setConfirmed(false);
       }
     });
   }
   async function record() {
-    if (!q || !sessionId || lock.current) return;
+    if (!q) return;
     stopPlayback();
-    await task("Opening microphone", async () => {
-      if (
-        !navigator.mediaDevices?.getUserMedia ||
-        typeof MediaRecorder === "undefined"
-      )
-        throw Error(
-          "Recording is unavailable in this browser. Switch to a typed answer.",
-        );
-      const mime = [
-        "audio/webm;codecs=opus",
-        "audio/mp4",
-        "audio/webm",
-        "audio/ogg;codecs=opus",
-      ].find((t) => MediaRecorder.isTypeSupported(t));
-      if (!mime)
-        throw Error("No supported recording format. Switch to a typed answer.");
-      const s = await navigator.mediaDevices.getUserMedia({ audio: true });
-      if (!alive.current) {
-        s.getTracks().forEach((t) => t.stop());
-        return;
-      }
-      stream.current = s;
-      const r = new MediaRecorder(s, { mimeType: mime });
-      recorder.current = r;
-      cancelled.current = false;
-      const chunks: BlobPart[] = [];
-      let bytes = 0;
-      const started = Date.now();
-      r.ondataavailable = (e) => {
-        chunks.push(e.data);
-        bytes += e.data.size;
-        if (bytes > 25 * 1024 * 1024 && r.state === "recording") r.stop();
-      };
-      r.onstop = () => {
-        s.getTracks().forEach((t) => t.stop());
-        if (timer.current) clearInterval(timer.current);
-        setRecording(false);
-        setDuration(
-          Math.min(q.maxAnswerSeconds, (Date.now() - started) / 1000),
-        );
-        if (!cancelled.current && alive.current) {
-          const b = new Blob(chunks, { type: r.mimeType });
-          setAudioBlob(b);
-          void transcribe(b);
-        }
-      };
-      r.onerror = () => {
-        cancelled.current = true;
-        if (r.state === "recording") r.stop();
-        s.getTracks().forEach((t) => t.stop());
-        if (timer.current) clearInterval(timer.current);
-        setRecording(false);
-        setError("Recording failed. Please record again or switch to typing.");
-      };
-      r.start(1000);
-      setElapsed(0);
-      setRecording(true);
-      timer.current = setInterval(() => {
-        const secs = Math.floor((Date.now() - started) / 1000);
-        setElapsed(secs);
-        if (secs >= q.maxAnswerSeconds && r.state === "recording") r.stop();
-      }, 250);
-    });
+    localAudio.current?.pause();
+    setTranscribed(false);
+    setRecordingReview(true);
+    dispatch({ type: "confirm", value: false });
+    await mic.start(remainingSeconds(q.maxAnswerSeconds, s.duration));
   }
-  function stop(cancel = false) {
-    cancelled.current = cancel;
-    if (recorder.current?.state === "recording") recorder.current.stop();
+  async function transcribe() {
+    if (!q || !mic.blob) return;
+    localAudio.current?.pause();
+    await run(
+      "Transcribing your recording",
+      async () => {
+        if (mic.blob!.size > 25 * 1024 * 1024)
+          throw Error(
+            "This recording is too large. Discard it and record less, or type.",
+          );
+        const r = await api.transcribe(id, q.id, mic.blob!);
+        dispatch({
+          type: "restore",
+          value: {
+            draft: r.transcript,
+            duration: s.duration + mic.seconds,
+            confirmed: false,
+            phase: "reviewing transcript",
+          },
+        });
+        setTranscribed(true);
+        setRecordingReview(false);
+      },
+      "transcribing",
+    );
   }
-  async function submit() {
-    if (!q || !sessionId || !confirmed || !draft.trim()) return;
-    await task("Evaluating your confirmed answer", async () => {
-      if (Date.now() < retryAt)
-        throw Error("Please wait for the retry delay before submitting again.");
-      const payload = pending ?? {
-        clientAnswerId: crypto.randomUUID(),
-        questionId: q.id,
-        transcript: draft,
-        inputMode: mode,
-        durationSeconds: mode === "voice" ? duration : null,
-      };
-      setPending(payload);
-      sessionStorage.setItem(
-        `draft:${sessionId}:${q.id}`,
-        JSON.stringify({ text: draft, mode, duration, pending: payload }),
-      );
-      const response = await api.submit(sessionId, payload);
-      setFeedback(response);
-      sessionStorage.removeItem(`draft:${sessionId}:${q.id}`);
-    });
+  function discardRecording() {
+    localAudio.current?.pause();
+    mic.discard();
+    setRecordingReview(false);
+    setTranscribed(false);
   }
-  async function next() {
-    if (!feedback || !sessionId) return;
+  function next() {
+    if (!s.feedback) return;
+    sessionStorage.setItem(`read:${id}`, String(s.session!.answers.length));
     stopPlayback();
-    if (feedback.nextTurn) {
-      setSession((s) =>
-        s
-          ? {
-              ...s,
-              status: feedback.status,
-              currentTurn: feedback.nextTurn,
-              answers: [...s.answers, feedback.answer],
-            }
-          : s,
-      );
-      setFeedback(null);
-      setConfirmed(false);
-      setAudioBlob(null);
-      setDraft("");
-      setDuration(null);
-      setPending(null);
-    } else router.push(`/results/${sessionId}`);
+    discardRecording();
+    if (s.feedback.nextTurn) {
+      dispatch({ type: "next" });
+    } else router.push(`/results/${id}`);
   }
   async function remove() {
-    if (!sessionId) return;
-    await task("Deleting session", async () => {
-      await api.delete(sessionId);
-      sessionStorage.removeItem(tokenKey(sessionId));
+    await run("Deleting this session", async () => {
+      await api.delete(id);
+      sessionStorage.removeItem(tokenKey(id));
       for (const k of Object.keys(sessionStorage))
-        if (k.startsWith(`draft:${sessionId}:`) || k === `consent:${sessionId}`)
+        if (k.includes(id) && !k.startsWith("token:"))
           sessionStorage.removeItem(k);
       router.push("/");
     });
   }
-  const available =
-    catalog?.availableInterviews.filter(
-      (a) => a.companyId === company && a.roleId === role,
-    ) ?? [];
-  const disabled = !!busy || recording;
   return (
-    <NotebookShell>
-      <div role="status" aria-live="polite">
-        {busy && <p className="notice">{busy}…</p>}
-        {recording && (
-          <p className="notice">
-            Recording · {elapsed}s / {q?.maxAnswerSeconds}s
-          </p>
-        )}
+    <NotebookShell
+      practice={
+        s.session
+          ? `${modes[s.session.round].title} practice`
+          : "Opening practice"
+      }
+    >
+      <div role="status" aria-live="polite" className="statusline">
+        {s.busy ||
+          (isRecording
+            ? "Recording your answer"
+            : playing
+              ? "Reading the question aloud"
+              : phase === "reviewing recording"
+                ? "Review your recording"
+                : phase === "reviewing transcript"
+                  ? "Review your words before submitting"
+                  : "")}
       </div>
-      {error && (
+      {s.error && (
         <div role="alert" className="error">
-          <p>{error}</p>
-          {!recording && (
-            <button onClick={() => void load()} disabled={!!busy}>
-              Reload saved state
-            </button>
-          )}
+          <p>{s.error}</p>
+          <button disabled={disabled} onClick={() => void load()}>
+            Reload saved practice
+          </button>
+          <Link href="/">Start a new practice</Link>
         </div>
       )}
-      {isMock && (
-        <p className="fixture">
-          Demo fixtures: scores and coaching are illustrative. Audio providers
-          are unavailable; typed answers complete the full journey.
-        </p>
-      )}
-      {!sessionId && catalog && (
+      {s.report ? (
+        <ReportView report={s.report} />
+      ) : s.feedback ? (
         <>
-          <p className="eyebrow">Three questions, at your pace</p>
-          <h2>Choose your practice</h2>
-          <p>Choose a focus for your three-question interview.</p>
-          <Link
-            href="/login"
-            onClick={() =>
-              sessionStorage.setItem(
-                "rehearsal:setup",
-                JSON.stringify({
-                  companyId: company,
-                  roleId: role,
-                  round,
-                  audioProcessingConsent: consent,
-                }),
-              )
-            }
-          >
-            Continue as guest or preview an account
-          </Link>
-          <div className="selects">
-            <label>
-              Company
-              <select
-                value={company}
-                onChange={(e) => {
-                  const a = catalog.availableInterviews.find(
-                    (x) => x.companyId === e.target.value,
-                  );
-                  setCompany(e.target.value);
-                  setRole(a?.roleId ?? "");
-                  setRound(a?.round ?? "behavioral");
-                }}
-              >
-                {catalog.companies
-                  .filter((c) =>
-                    catalog.availableInterviews.some(
-                      (a) => a.companyId === c.id,
-                    ),
-                  )
-                  .map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <label>
-              Role
-              <select
-                value={role}
-                onChange={(e) => {
-                  setRole(e.target.value);
-                  setRound(
-                    catalog.availableInterviews.find(
-                      (a) =>
-                        a.companyId === company && a.roleId === e.target.value,
-                    )!.round,
-                  );
-                }}
-              >
-                {catalog.roles
-                  .filter((r) =>
-                    catalog.availableInterviews.some(
-                      (a) => a.companyId === company && a.roleId === r.id,
-                    ),
-                  )
-                  .map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
-              </select>
-            </label>
-          </div>
-          <fieldset>
-            <legend>What would you like to practice?</legend>
-            <div className="modegrid">
-              {Object.entries(modes).map(([key, v]) => (
-                <label
-                  className={`modecard ${round === key ? "selected" : ""}`}
-                  key={key}
-                >
-                  <input
-                    type="radio"
-                    name="round"
-                    value={key}
-                    checked={round === key}
-                    disabled={!available.some((a) => a.round === key)}
-                    onChange={() => setRound(key as InterviewMode)}
-                  />
-                  <strong>{v.title}</strong>
-                  <span>{v.description}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          <p className="fine">
-            Up to {modes[round].limit} per answer. Review and confirm each
-            transcript before it is evaluated.
-          </p>
-          <div className="privacy">
-            <p>
-              In live mode, answers are sent to AI providers for feedback.
-              Consenting audio is sent for transcription and discarded by the
-              app afterward. Session transcripts may be retained for up to 24
-              hours; provider retention may differ.
-            </p>
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={consent}
-                onChange={(e) => setConsent(e.target.checked)}
-              />
-              I consent to audio processing for transcription.
-            </label>
-            <p className="fine">
-              Optional. You can complete the interview by typing. Microphone
-              permission is requested only when you record.
-            </p>
-          </div>
-          <button
-            className="primary"
-            disabled={!!busy || !available.some((a) => a.round === round)}
-            onClick={() => void start()}
-          >
-            Start my practice <span>→</span>
+          <p className="eyebrow">Answer saved</p>
+          <h1 ref={heading} tabIndex={-1}>
+            A moment to reflect
+          </h1>
+          <AnswerFeedback answer={s.feedback.answer} />
+          <button className="primary" disabled={disabled} onClick={next}>
+            {s.feedback.nextTurn ? "Next question" : "Read my report"}
           </button>
         </>
-      )}
-      {session && !report && !feedback && q && !results && (
+      ) : q && !results ? (
         <>
+          {welcome && s.session?.answers.length === 0 && (
+            <div className="welcome">
+              <h1>Take a moment to think.</h1>
+              <p>
+                We’ll work through three questions. Speak or type, review your
+                words, then ask for feedback. You decide when to move on.
+              </p>
+              <button onClick={() => setWelcome(false)}>I’m ready</button>
+            </div>
+          )}
           <p className="eyebrow">
-            Question {session.currentTurn!.questionNumber} of{" "}
-            {session.currentTurn!.totalQuestions} · {modes[q.kind].title}
+            Question {s.session!.currentTurn!.questionNumber} of 3 ·{" "}
+            {modes[q.kind].title}
           </p>
           <progress
             max={3}
-            value={session.answers.length}
-            aria-label="Answers completed"
+            value={s.session!.answers.length}
+            aria-label="Questions completed"
           />
-          <h2>{q.text}</h2>
+          <p className="interviewer">Your practice interviewer</p>
+          <h2 className="question-heading" ref={heading} tabIndex={-1}>
+            {q.text}
+          </h2>
           <p className="fine">
             {q.origin === "generated"
               ? "Generated practice question"
-              : (q.sourceLabel ?? "Curated practice question")}{" "}
-            · State reasonable assumptions. No code required.
+              : (q.sourceLabel ?? "Curated practice question")}
+            . State reasonable assumptions; no code is required.
           </p>
           <button
             disabled={disabled}
             onClick={() => (playing ? stopPlayback() : void play())}
           >
-            {playing ? "Stop audio" : "▶ Play question"}
+            {playing ? "Stop question audio" : "Listen to the question"}
           </button>
           <div className="tabs">
             <button
-              aria-pressed={mode === "voice"}
-              disabled={disabled || !!pending}
+              aria-pressed={s.mode === "voice"}
+              disabled={disabled || !!s.pending || !s.consent}
               onClick={() => {
-                setMode("voice");
-                setConfirmed(false);
+                dispatch({ type: "mode", mode: "voice" });
               }}
             >
-              Spoken answer
+              Speak
             </button>
             <button
-              aria-pressed={mode === "text"}
-              disabled={disabled || !!pending}
+              aria-pressed={s.mode === "text"}
+              disabled={disabled || !!s.pending}
               onClick={() => {
-                setMode("text");
-                setConfirmed(false);
-                setDuration(null);
+                stopPlayback();
+                discardRecording();
+                dispatch({ type: "mode", mode: "text" });
               }}
             >
-              Typed answer
+              Type instead
             </button>
           </div>
-          {mode === "voice" && (
+          {!s.consent && (
+            <p className="fine">
+              Typing is available. To use recording, start a new practice with
+              audio consent.
+            </p>
+          )}
+          {s.mode === "voice" && (
             <div className="recordbox">
               <p>
-                Up to {q.maxAnswerSeconds / 60} minutes. Stop when you are
-                ready, then review your transcript.
+                {Math.ceil(remainingSeconds(q.maxAnswerSeconds, s.duration))}{" "}
+                seconds of recording available for this question.
               </p>
-              {!audioConsent ? (
-                <p>
-                  Audio consent was not given for this session. Use a typed
-                  answer, or start a new session with consent.
-                </p>
-              ) : recording ? (
+              {audioBusy ? (
                 <>
-                  <button className="primary" onClick={() => stop()}>
-                    Stop & transcribe
+                  <p>
+                    {isRecording && <span className="recording-dot" />}
+                    {mic.stage} · {Math.ceil(mic.seconds)} seconds
+                  </p>
+                  <label>
+                    Microphone level
+                    <meter min={0} max={1} value={mic.level} />
+                  </label>
+                  <button disabled={!isRecording} onClick={() => mic.stop()}>
+                    Stop recording
                   </button>
-                  <button onClick={() => stop(true)}>Cancel recording</button>
+                  <button
+                    disabled={!isRecording}
+                    onClick={() => {
+                      mic.stop(true);
+                      setRecordingReview(false);
+                    }}
+                  >
+                    Cancel recording
+                  </button>
                 </>
               ) : (
                 <button
-                  disabled={disabled || !!pending}
+                  disabled={
+                    disabled ||
+                    !!s.pending ||
+                    remainingSeconds(q.maxAnswerSeconds, s.duration) <= 0
+                  }
                   onClick={() => void record()}
                 >
-                  ● Record answer
+                  {mic.blob ? "Record again" : "Record my answer"}
                 </button>
               )}
-              {audioBlob && !recording && (
-                <button
-                  disabled={disabled}
-                  onClick={() => void transcribe(audioBlob!)}
-                >
-                  Retry transcription
-                </button>
+              {mic.error && <p role="status">{mic.error}</p>}
+              {mic.url && !audioBusy && (
+                <>
+                  <h3>Review your recording</h3>
+                  <audio
+                    ref={localAudio}
+                    controls
+                    src={mic.url}
+                    onPlay={stopPlayback}
+                    onError={() =>
+                      dispatch({
+                        type: "failure",
+                        message:
+                          "Recording playback is unavailable. You may still transcribe it or type instead.",
+                      })
+                    }
+                  />
+                  <p className="fine">
+                    Kept in memory in this tab. Nothing is uploaded until you
+                    choose transcription.
+                  </p>
+                  <button
+                    disabled={disabled || transcribed || !!s.pending}
+                    onClick={() => void transcribe()}
+                  >
+                    {s.draft
+                      ? "Transcribe / retry transcription"
+                      : "Transcribe this recording"}
+                  </button>
+                  <button
+                    disabled={disabled || !!s.pending}
+                    onClick={discardRecording}
+                  >
+                    Discard recording
+                  </button>
+                </>
               )}
             </div>
           )}
-          <label className="answerlabel">
-            {mode === "voice"
+          <label>
+            {s.mode === "voice"
               ? "Review and correct your transcript"
               : "Your answer"}
             <textarea
+              rows={7}
               maxLength={10000}
-              rows={8}
-              value={draft}
-              readOnly={!!pending}
+              value={s.draft}
               disabled={disabled}
-              placeholder={
-                mode === "voice"
-                  ? "Your transcript will appear here. You can correct it before submitting."
-                  : "Take your time. Explain your reasoning…"
-              }
-              onChange={(e) => {
-                setDraft(e.target.value);
-                setConfirmed(false);
-              }}
+              readOnly={!!s.pending}
+              placeholder="Take your time. Explain your reasoning…"
+              onChange={(e) => dispatch({ type: "edit", text: e.target.value })}
             />
           </label>
           <p className="fine">
-            {draft.length.toLocaleString()} / 10,000 characters
-            {pending
-              ? " · A submission is pending. Retry uses the same confirmed answer."
-              : ""}
+            {s.draft.length.toLocaleString()} / 10,000 characters.{" "}
+            {s.pending
+              ? "Your submitted answer is held unchanged for a safe retry."
+              : "Your draft is saved in this tab."}
           </p>
           <label className="check">
             <input
               type="checkbox"
-              checked={confirmed}
-              disabled={disabled}
-              onChange={(e) => setConfirmed(e.target.checked)}
+              checked={s.confirmed}
+              disabled={disabled || !s.draft.trim() || recordingReview}
+              onChange={(e) =>
+                dispatch({ type: "confirm", value: e.target.checked })
+              }
             />
-            I reviewed this answer and am ready to submit it.
+            I reviewed my complete answer and am ready for feedback.
           </label>
           <button
             className="primary"
             disabled={
               disabled ||
-              !confirmed ||
-              !draft.trim() ||
-              (mode === "voice" && duration === null)
+              !s.confirmed ||
+              !s.draft.trim() ||
+              recordingReview ||
+              (s.mode === "voice" && s.duration === 0)
             }
-            onClick={() => void submit()}
+            onClick={() => {
+              stopPlayback();
+              void submit();
+            }}
           >
-            {pending ? "Retry confirmed answer" : "Submit confirmed answer"} →
+            {s.pending ? "Retry the same answer" : "Get feedback"}
           </button>
           <p className="fine">
-            Skipping is unavailable. You may submit an honest partial response
-            or start a new practice.
+            You can submit an honest partial answer. Skipping questions is not
+            available.
           </p>
         </>
-      )}
-      {feedback && (
+      ) : s.session?.status === "active" && results ? (
         <>
-          <p className="eyebrow">Answer saved. Take a moment to reflect.</p>
-          <Feedback answer={feedback.answer} />
-          <button
-            className="primary"
-            disabled={!!busy}
-            onClick={() => void next()}
-          >
-            {feedback.nextTurn ? "Next question" : "View my report"} →
-          </button>
+          <h1>This practice is still in progress</h1>
+          <Link href={`/interview/${id}`}>Return to your interview</Link>
         </>
-      )}
-      {report && (
-        <>
-          <p className="eyebrow">A few notes for next time.</p>
-          <h2>Your practice report</h2>
-          <div className="bigscore">
-            {report.overallScore}
-            <span>/ 100</span>
-          </div>
-          <p>
-            Coaching estimate · {modes[report.round].title}
-            {isMock ? " · Fixed illustrative score" : ""}
-          </p>
-          <div className="metrics">
-            {Object.entries(report.categoryAverages).map(([k, v]) => (
-              <span key={k}>
-                {k} <b>{v}</b>
-              </span>
-            ))}
-          </div>
-          <h3>Strengths</h3>
-          <ul>
-            {report.strengths.map((s, i) => (
-              <li key={i}>{s}</li>
-            ))}
-          </ul>
-          <h3>Your next practice</h3>
-          <ul>
-            {report.nextSteps.map((s, i) => (
-              <li key={i}>{s}</li>
-            ))}
-          </ul>
-          {report.answers.map((a, i) => (
-            <details className="answerdetail" key={a.answerId}>
-              <summary>
-                Question {i + 1} · {modes[a.evaluation.questionKind].title} ·{" "}
-                {a.evaluation.overallScore}/100
-              </summary>
-              <Feedback answer={a} />
-            </details>
+      ) : !s.busy && !s.error ? (
+        <p>Opening your notebook…</p>
+      ) : null}
+      {s.session && s.session.answers.length > 0 && !s.report && (
+        <details>
+          <summary>
+            Your conversation so far · {s.session.answers.length} answered
+          </summary>
+          {s.session.answers.map((a, i) => (
+            <section key={a.answerId}>
+              <h3>
+                Question {i + 1} · {modes[a.evaluation.questionKind].title}
+              </h3>
+              <AnswerFeedback answer={a} />
+            </section>
           ))}
-          <Link className="primary" href="/">
-            Start another practice →
-          </Link>
-        </>
+        </details>
       )}
-      {session && (
+      {s.session && (
         <div className="sessionactions">
-          {results && !report && session.status === "active" && (
-            <Link href={`/interview/${sessionId}`}>Return to interview</Link>
-          )}
+          <Link href="/">New practice</Link>
           <button disabled={disabled} onClick={() => void remove()}>
             Delete this session
           </button>
-          <Link href="/">New practice</Link>
         </div>
       )}
     </NotebookShell>
