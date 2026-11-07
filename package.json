@@ -14,7 +14,7 @@
     "test": "npm run test:frontend && npm run test:backend",
     "seed": "node --conditions=react-server --import tsx --env-file=.env.local scripts/seed.ts",
     "smoke": "node scripts/smoke.mjs",
-    "test:frontend": "tsx --test tests/api.test.ts tests/dialogue.test.ts tests/frontend.test.ts tests/interview.test.ts tests/media.test.ts",
+    "test:frontend": "tsx --test tests/api.test.ts tests/dialogue.test.ts tests/frontend.test.ts tests/interview.test.ts tests/media.test.ts tests/live-room.test.ts",
     "test:backend": "vitest run"
   },
   "dependencies": {

@@ -1039,6 +1039,85 @@ html[data-theme="light"] body {
 html:has(.motion-experience[data-motion="paused"]) {
   scroll-behavior: auto;
 }
+.motion-experience .experience-shell .voice-room {
+  width: min(100%, 880px);
+  margin: 0 auto;
+}
+.motion-experience .experience-shell .voice-room .conversation-stage {
+  min-height: 370px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 38px 28px 24px;
+  background: radial-gradient(ellipse at 50% 25%, var(--soft), var(--paper) 70%);
+  border-radius: 24px;
+}
+.motion-experience .experience-shell .voice-room .voice-emblem {
+  width: 124px;
+  height: 124px;
+  margin: 4px auto 30px;
+  transform: none;
+  box-shadow: 0 0 0 12px color-mix(in srgb, var(--green) 4%, transparent), 0 0 0 26px color-mix(in srgb, var(--green) 2%, transparent);
+  transition: opacity 250ms ease, box-shadow 250ms ease;
+}
+.voice-room[data-state="paused"] .voice-emblem { opacity: 0.45; }
+.voice-room[data-state="thinking"] .voice-emblem,
+.voice-room[data-state="connecting"] .voice-emblem,
+.voice-room[data-state="finishing"] .voice-emblem { animation: room-breathe 2s ease-in-out infinite; }
+.voice-room[data-state="listening"] .voice-emblem.is-speaking span { animation-duration: 1.4s; }
+.motion-experience .experience-shell .voice-room .room-heading {
+  font: 400 clamp(30px, 4vw, 44px)/1.2 var(--editorial);
+  letter-spacing: -1px;
+  margin: 14px 0;
+}
+.voice-room .room-guidance { max-width: 420px; color: var(--muted); font-size: 14px; line-height: 1.7; }
+.motion-experience .experience-shell .voice-room .live-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 16px 0;
+}
+.motion-experience .experience-shell .voice-room .live-controls button {
+  min-height: 48px;
+  min-width: 104px;
+  margin: 0;
+  border-radius: 100px;
+  padding: 12px 22px;
+  font-size: 13px;
+}
+.motion-experience .experience-shell .voice-room .live-controls .finish-interview {
+  color: var(--green);
+  border-color: var(--green);
+  background: var(--soft);
+}
+.voice-command-hint { color: var(--muted); font-size: 12px; line-height: 1.7; text-align: center; margin: 0 auto 28px; max-width: 470px; }
+.voice-room .quiet-control { display: block; margin: 0 auto 16px; }
+.voice-room .room-options { margin: 20px auto; padding: 16px 24px; border-top: 1px solid var(--line); }
+.voice-room .room-options summary { color: var(--muted); font-size: 12px; cursor: pointer; }
+.voice-room .room-options button { margin: 10px 12px 0 0; }
+.voice-room .current-prompt { padding: 22px 0; border-bottom: 1px solid var(--line); }
+.voice-room .current-prompt h2 { font-size: 21px; line-height: 1.5; font-weight: 500; }
+.voice-room .current-prompt .transcript { margin-top: 20px; padding: 14px; background: var(--soft); border-radius: 8px; }
+.voice-room .recap-controls { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 22px 24px; margin-top: 24px; background: var(--soft); border: 1px solid var(--line); border-radius: 14px; }
+.voice-room .recap-controls p { margin: 6px 0; font-size: 13px; line-height: 1.5; }
+.voice-room .recap-controls .eyebrow { font-size: 10px; }
+.voice-room .recap-controls button { flex-shrink: 0; min-height: 44px; }
+.voice-room .report-coverage { border-left: 3px solid var(--green); padding-left: 16px; line-height: 1.7; color: var(--muted); }
+.voice-room .empty-interview { text-align: center; padding: 60px 20px; }
+.voice-room :is(button, summary, a):focus-visible { outline: 3px solid var(--green); outline-offset: 4px; }
+.motion-experience .experience-shell .voice-room .question-progress .reached { color: var(--green); border-color: var(--green); background: var(--soft); }
+@keyframes room-breathe { 50% { opacity: 0.5; } }
+@media (max-width: 600px) {
+  .motion-experience .experience-shell .voice-room .conversation-stage { min-height: 340px; padding: 34px 18px 20px; }
+  .motion-experience .experience-shell .voice-room .live-controls { display: grid; grid-template-columns: 1fr 1fr; }
+  .motion-experience .experience-shell .voice-room .live-controls .finish-interview { grid-column: 1 / -1; }
+  .voice-room .recap-controls { align-items: stretch; flex-direction: column; gap: 12px; }
+  .voice-room .room-topline { flex-wrap: wrap; gap: 16px; }
+  .voice-room .room-topline .tag { max-width: 100%; font-size: 10px; }
+}
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

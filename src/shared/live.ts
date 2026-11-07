@@ -3,6 +3,14 @@ import type { Question, SessionReport } from "./contracts";
 export const liveRequestSchema = z.discriminatedUnion("kind", [
   z
     .object({
+      kind: z.literal("control"),
+      clientRequestId: z.uuid(),
+      revision: z.number().int().nonnegative(),
+      action: z.enum(["repeat", "pause", "finish"]),
+    })
+    .strict(),
+  z
+    .object({
       kind: z.literal("utterance"),
       clientRequestId: z.uuid(),
       revision: z.number().int().nonnegative(),
@@ -30,6 +38,7 @@ export interface LiveMessage {
   mainNumber: number;
 }
 export interface LiveView {
+  control?: "pause";
   sessionId: string;
   revision: number;
   status: "active" | "completed" | "cancelled";
@@ -42,4 +51,62 @@ export interface LiveView {
   spokenText: string;
   report: SessionReport | null;
   dataMode: "verified" | "illustrative";
+}
+
+// Match whole requests only: discussing a pause or finishing a project is answer evidence.
+export function spokenControl(
+  text: string,
+): "repeat" | "pause" | "finish" | "handoff" | null {
+  const command = text
+    .toLowerCase()
+    .trim()
+    .replace(/[.!?,;:]+$/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/^(?:please |can you |could you )/, "")
+    .replace(/ please$/, "");
+  if (
+    /^(?:repeat(?: (?:that|the question|the interviewer))?|say that again)$/.test(
+      command,
+    )
+  )
+    return "repeat";
+  if (
+    /^(?:pause(?: (?:the interview|interview))?|take a break|i need a break)$/.test(
+      command,
+    )
+  )
+    return "pause";
+  if (
+    /^(?:(?:finish|end|stop) (?:the |my )?interview|finish and review|finish & review)$/.test(
+      command,
+    )
+  )
+    return "finish";
+  if (
+    /^(?:i['’]?m done|i am done|done answering|that['’]?s my answer)$/.test(
+      command,
+    )
+  )
+    return "handoff";
+  return null;
+}
+
+export function reportRecap(
+  report: Pick<
+    SessionReport,
+    "overallScore" | "strengths" | "nextSteps" | "coverage"
+  >,
+) {
+  const coverage = report.coverage;
+  return [
+    coverage?.finishedEarly
+      ? `You finished early. This recap covers ${coverage.answeredMainQuestions} of ${coverage.plannedMainQuestions} main questions.`
+      : "Your interview is complete.",
+    `Your practice score is ${report.overallScore} out of 100.`,
+    report.strengths[0] ? `One strength: ${report.strengths[0]}` : "",
+    report.nextSteps[0] ? `For your next practice: ${report.nextSteps[0]}` : "",
+    "Your full report is ready to explore.",
+  ]
+    .filter(Boolean)
+    .join(" ");
 }

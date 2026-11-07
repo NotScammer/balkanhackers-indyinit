@@ -61,8 +61,11 @@ export default function SetupView() {
           round: saved.round,
           audioProcessingConsent: true,
         };
-        setPending(next);
-        void begin(next);
+        const timer = setTimeout(() => {
+          setPending(next);
+          void begin(next);
+        }, 0);
+        return () => clearTimeout(timer);
       }
     } catch {}
     // Resume a deliberate selection once the catalog is ready after sign-in.
@@ -180,7 +183,8 @@ export default function SetupView() {
           Select a company and role to start. Each interview includes
           behavioral, technical and system design questions, with adaptive
           follow-ups. Published process guides are below; ↔ means the count
-          varies or is unpublished.
+          varies or is unpublished. Talk naturally, pause whenever you need, and
+          review all scores and feedback after you finish.
         </p>
         <div
           className="company-filters"

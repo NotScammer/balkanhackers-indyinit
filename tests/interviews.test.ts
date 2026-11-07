@@ -192,7 +192,7 @@ describe('authorized durable three-turn flow', () => {
     const consented = await create('technical', true);
     expect((await api.realtime(request(consented.sessionToken), consented.sessionId)).status).toBe(200);
     const cfg = realtimeConfig((await db.snapshot(consented.sessionId))!, 'configured-model', 'configured-transcriber');
-    expect(cfg.audio.input.turn_detection.create_response).toBe(false);
+    expect(cfg.audio.input.turn_detection?.create_response).toBe(false);
     expect(cfg.instructions).not.toContain('Assess the reasoning');
   });
   it('caps follow-up depth and preserves mixed coverage', async () => {

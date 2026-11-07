@@ -1,4 +1,5 @@
 import "server-only";
+import { z } from "zod";
 import { liveRequestSchema } from "@/shared/live";
 import { authorize } from "../auth";
 import { body, handle, json, sessionId } from "../http";
@@ -15,7 +16,12 @@ export function createLiveApi(deps: ApiDependencies) {
   };
   const service = new LiveService(deps.db, ai);
   async function state(request: Request, id: string) {
-    const snapshot = await authorize(deps.db, sessionId(id), request, deps.authenticate);
+    const snapshot = await authorize(
+      deps.db,
+      sessionId(id),
+      request,
+      deps.authenticate,
+    );
     if (!snapshot.session.audio_processing_consent)
       throw new AppError(
         "AUDIO_CONSENT_REQUIRED",
@@ -32,8 +38,16 @@ export function createLiveApi(deps: ApiDependencies) {
       }),
     turn: (request: Request, id: string) =>
       handle(async () => {
-        const { snapshot } = await state(request, id);
+        const { snapshot, saved } = await state(request, id);
         const input = await body(request, liveRequestSchema);
+        if (
+          saved.status === "cancelled" &&
+          input.kind === "control" &&
+          input.action === "finish"
+        ) {
+          await deps.db.rpc("end_interview", { p_session_id: id });
+          return json(liveView(saved, snapshot));
+        }
         for (const [key, limit] of [
           [`live:${id}`, 100],
           ["live:global", 2000],
@@ -57,11 +71,30 @@ export function createLiveApi(deps: ApiDependencies) {
     token: (request: Request, id: string) =>
       handle(async () => {
         const { snapshot, saved } = await state(request, id);
-        if (saved.status !== "active" || snapshot.session.status !== "active")
+        const { purpose } = request.body
+          ? await body(
+              request,
+              z
+                .object({
+                  purpose: z.enum(["interview", "recap"]).default("interview"),
+                })
+                .strict(),
+            )
+          : { purpose: "interview" as const };
+        const recap = purpose === "recap";
+        if (
+          recap
+            ? saved.status !== "completed" ||
+              snapshot.session.status !== "completed" ||
+              !snapshot.report
+            : saved.status !== "active" || snapshot.session.status !== "active"
+        )
           throw new AppError(
             "SESSION_INCOMPLETE",
             409,
-            "This interview has ended.",
+            recap
+              ? "Finish your interview before playing its recap."
+              : "This interview has ended.",
           );
         for (const [key, limit] of [
           [`realtime:${id}`, 6],
@@ -81,7 +114,7 @@ export function createLiveApi(deps: ApiDependencies) {
               true,
             );
         }
-        return json(await deps.realtime(snapshot));
+        return json(await deps.realtime(snapshot, purpose));
       }),
   };
 }

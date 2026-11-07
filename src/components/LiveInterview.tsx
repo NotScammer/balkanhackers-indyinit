@@ -1,460 +1,226 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { api, tokenKey } from "../lib/client/api";
-import type { LiveRequest, LiveView } from "@/shared/live";
-import { LiveAudio } from "../lib/client/live-audio";
-import { liveApi } from "../lib/client/live-api";
-import { RequestError } from "../lib/client/api";
+import { useLiveInterview } from "../hooks/useLiveInterview";
 import AppShell from "./AppShell";
 import { ReportView } from "./FeedbackView";
 
 export default function LiveInterview({ id }: { id: string }) {
-  const router = useRouter();
-  const [view, setView] = useState<LiveView | null>(null);
-  const [error, setError] = useState("");
-  const [status, setStatus] = useState("Opening your interview");
-  const [connected, setConnected] = useState(false);
-  const [connecting, setConnecting] = useState(false);
-  const [muted, setMuted] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [partial, setPartial] = useState("");
-  const [pending, setPending] = useState<LiveRequest[]>([]);
-  const [editing, setEditing] = useState<string | null>(null);
-  const [correction, setCorrection] = useState("");
-  const current = useRef<LiveView | null>(null);
-  const mounted = useRef(true);
-  const audioElement = useRef<HTMLAudioElement>(null);
-  const audio = useRef<LiveAudio | null>(null);
-  const queue = useRef<LiveRequest[]>([]);
-  const working = useRef(false);
-  const connectionAttempt = useRef(false);
-  const expiryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const key = `live-pending:${id}`;
-  function update(next: LiveView) {
-    current.current = next;
-    if (mounted.current) setView(next);
-  }
-  function persist() {
-    sessionStorage.setItem(key, JSON.stringify(queue.current));
-    if (mounted.current) setPending([...queue.current]);
-  }
-  function disconnect() {
-    audio.current?.close();
-    audio.current = null;
-    connectionAttempt.current = false;
-    if (expiryTimer.current) clearTimeout(expiryTimer.current);
-    if (mounted.current) {
-      setConnected(false);
-      setConnecting(false);
-      setMuted(false);
-    }
-  }
-  useEffect(() => {
-    mounted.current = true;
-    let active = true;
-    liveApi
-      .get(id)
-      .then((next) => {
-        if (!active) return;
-        current.current = next;
-        setView(next);
-        setStatus(
-          next.status === "active" ? "Ready to connect" : "Interview ended",
-        );
-        try {
-          const saved = JSON.parse(sessionStorage.getItem(key) ?? "[]");
-          if (Array.isArray(saved)) {
-            queue.current = saved;
-            setPending(saved);
-          }
-        } catch {}
-      })
-      .catch((e) => {
-        if (active)
-          setError(
-            e instanceof Error ? e.message : "Could not open your interview.",
-          );
-      });
-    return () => {
-      active = false;
-      mounted.current = false;
-      audio.current?.close();
-      connectionAttempt.current = false;
-      if (expiryTimer.current) clearTimeout(expiryTimer.current);
-    };
-  }, [id, key]);
-  useEffect(() => {
-    if (view?.status !== "active") return;
-    const autoStartKey = `autostart:${id}`;
-    if (sessionStorage.getItem(autoStartKey) !== "true") return;
-    sessionStorage.removeItem(autoStartKey);
-    void connect();
-    // Only a newly selected interview auto-connects; manual reconnect stays available.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, view?.status]);
-  async function processQueue() {
-    if (working.current || !queue.current.length || !mounted.current) return;
-    working.current = true;
-    setBusy(true);
-    setError("");
-    setStatus("Considering your answer");
-    try {
-      const input = queue.current[0];
-      const result = await liveApi.turn(id, input);
-      const next =
-        current.current && result.revision < current.current.revision
-          ? await liveApi.get(id)
-          : result;
-      if (!mounted.current) return;
-      update(next);
-      queue.current.shift();
-      // Later queued utterances have not been sent yet. Preserve their speech-start question, but use the newly saved revision.
-      if (queue.current.length)
-        queue.current[0] = { ...queue.current[0], revision: next.revision };
-      persist();
-      audio.current?.speak(next.spokenText);
-      if (next.status !== "active") {
-        audio.current?.mute(true);
-        setMuted(true);
-        // Leave playback open for the final spoken feedback, then release all tracks.
-        if (expiryTimer.current) clearTimeout(expiryTimer.current);
-        expiryTimer.current = setTimeout(disconnect, 60000);
-      }
-    } catch (e) {
-      if (mounted.current) {
-        const message =
-          e instanceof Error
-            ? e.message
-            : "Could not save this turn. Your transcript is preserved.";
-        setError(message);
-        audio.current?.mute(true);
-        setMuted(true);
-        if (e instanceof RequestError && e.code === "QUESTION_OUT_OF_ORDER") {
-          const fresh = await liveApi.get(id).catch(() => null);
-          if (fresh && mounted.current) update(fresh);
-        }
-      }
-      return;
-    } finally {
-      working.current = false;
-      if (mounted.current) setBusy(false);
-    }
-    if (queue.current.length) void processQueue();
-  }
-  function enqueue(input: LiveRequest) {
-    queue.current.push(input);
-    persist();
-    void processQueue();
-  }
-  async function connect() {
-    if (
-      connectionAttempt.current ||
-      !current.current ||
-      current.current.status !== "active"
-    )
-      return;
-    connectionAttempt.current = true;
-    setConnecting(true);
-    setError("");
-    try {
-      const fresh = await liveApi.get(id);
-      if (!mounted.current || !connectionAttempt.current) return;
-      update(fresh);
-      const token = await liveApi.token(id);
-      if (
-        !mounted.current ||
-        !connectionAttempt.current ||
-        !audioElement.current
-      )
-        return;
-      const connection = new LiveAudio(audioElement.current, {
-        questionId: () => current.current?.currentQuestion?.id ?? null,
-        onTranscript: (_itemId, text, questionId) => {
-          const saved = current.current;
-          if (
-            !mounted.current ||
-            !saved ||
-            saved.status !== "active" ||
-            !questionId
-          )
-            return;
-          enqueue({
-            kind: "utterance",
-            clientRequestId: crypto.randomUUID(),
-            revision: saved.revision,
-            questionId,
-            transcript: text,
-          });
-        },
-        onPartial: (delta) => {
-          if (mounted.current)
-            setPartial((previous) => (delta ? previous + delta : ""));
-        },
-        onStatus: (next) => {
-          if (!mounted.current) return;
-          setStatus(next);
-        },
-        onPlaybackEnd: () => {
-          if (current.current?.status === "completed") disconnect();
-        },
-        onDisconnected: () => {
-          if (mounted.current) {
-            setConnected(false);
-            setConnecting(false);
-          }
-        },
-        onError: (message) => {
-          if (mounted.current) setError(message);
-        },
-      });
-      audio.current?.close();
-      audio.current = connection;
-      await connection.connect(
-        token.clientSecret,
-        fresh.revision === 0
-          ? fresh.spokenText
-          : `Welcome back. ${fresh.currentQuestion?.text ?? ""}`,
-      );
-      if (!mounted.current || audio.current !== connection) {
-        connection.close();
-        return;
-      }
-      setConnected(true);
-      setMuted(false);
-      if (pending.length) {
-        connection.mute(true);
-        setMuted(true);
-      }
-      const remaining = Math.min(
-        30 * 60 * 1000,
-        Date.parse(fresh.expiresAt) - Date.now(),
-      );
-      expiryTimer.current = setTimeout(
-        () => {
-          disconnect();
-          setStatus(
-            "Audio paused. Reconnect to continue if the session is still available.",
-          );
-        },
-        Math.max(0, remaining),
-      );
-    } catch (e) {
-      disconnect();
-      if (mounted.current)
-        setError(
-          e instanceof Error ? e.message : "Live audio could not connect.",
-        );
-    } finally {
-      connectionAttempt.current = false;
-      if (mounted.current) setConnecting(false);
-    }
-  }
-  async function end() {
-    disconnect();
-    setBusy(true);
-    setError("");
-    try {
-      await liveApi.end(id);
-      update(await liveApi.get(id));
-      setStatus("Interview ended");
-    } catch (e) {
-      setError(
-        e instanceof Error
-          ? e.message
-          : "Could not save the end of your interview. Audio is disconnected.",
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function deleteSession() {
-    disconnect();
-    setBusy(true);
-    try {
-      await api.delete(id);
-      sessionStorage.removeItem(key);
-      sessionStorage.removeItem(tokenKey(id));
-      router.push("/");
-    } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "Could not delete the session.",
-      );
-    } finally {
-      if (mounted.current) setBusy(false);
-    }
-  }
-  function saveCorrection() {
-    if (!editing || !correction.trim() || !current.current) return;
-    enqueue({
-      kind: "correct",
-      clientRequestId: crypto.randomUUID(),
-      revision: current.current.revision,
-      answerId: editing,
-      transcript: correction.trim(),
-    });
-    setEditing(null);
-  }
-  function appendPendingToLastAnswer() {
-    const saved = current.current;
-    const last = saved?.messages.findLast(
-      (m) => m.role === "candidate" && m.kind === "answer",
-    );
-    const input = queue.current[0];
-    if (!saved || !last || input?.kind !== "utterance") return;
-    queue.current.shift();
-    queue.current.unshift({
-      kind: "correct",
-      clientRequestId: crypto.randomUUID(),
-      revision: saved.revision,
-      answerId: last.id,
-      transcript: `${last.text}\n\n${input.transcript}`,
-    });
-    persist();
-    void processQueue();
-  }
-  const active = view?.status === "active";
-  const latestFeedback = view?.messages.findLast((m) => m.kind === "feedback");
+  const room = useLiveInterview(id);
   return (
-    <AppShell practice="Live interview">
+    <AppShell practice="Your interview room" returnTo={`/interview/${id}`}>
+      <InterviewRoom room={room} />
+    </AppShell>
+  );
+}
+
+export function InterviewRoom({
+  room,
+}: {
+  room: ReturnType<typeof useLiveInterview>;
+}) {
+  const {
+    view,
+    error,
+    status,
+    connected,
+    connecting,
+    paused,
+    busy,
+    finishing,
+    finishFailed,
+    recapPlaying,
+    partial,
+    pending,
+    editing,
+    correction,
+  } = room;
+  const active = view?.status === "active";
+  const roomState = finishing
+    ? "finishing"
+    : connecting
+      ? "connecting"
+      : paused
+        ? "paused"
+        : busy
+          ? "thinking"
+          : connected
+            ? status.includes("speaking")
+              ? "speaking"
+              : "listening"
+            : "ready";
+  const roomTitle = {
+    finishing: "Bringing it all together",
+    connecting: "Getting connected",
+    paused: "Take your time",
+    thinking: "A moment to reflect",
+    speaking: "Your interviewer",
+    listening: "The floor is yours",
+    ready: "Find your voice",
+  }[roomState];
+  return (
+    <>
       <audio
-        ref={audioElement}
+        ref={(element) => room.attachAudio(element)}
         autoPlay
-        aria-label="Interviewer audio playback"
         className="live-player"
-        hidden
       />
       {!view ? (
         <>
-          <p role="status">Opening your interview…</p>
+          <h1>
+            {error ? "Your room is unavailable" : "Opening your interview…"}
+          </h1>
           {error && (
-            <p role="alert" className="error">
-              {error}
-            </p>
+            <>
+              <p role="alert" className="error">
+                {error}
+              </p>
+              <button onClick={() => window.location.reload()}>Retry</button>
+            </>
           )}
-          <button onClick={() => window.location.reload()}>Retry</button>
         </>
       ) : (
-        <>
+        <div className="voice-room" data-state={roomState}>
           <div className="room-topline">
             <span className="tag">
               <span className="status-dot" />
-              Your Talk To Future room
+              {active
+                ? "A conversation about your future"
+                : "Your interview, reflected"}
             </span>
-            <div
-              className="question-progress"
-              aria-label={`Main question ${view.mainNumber} of 3`}
-            >
-              {[1, 2, 3].map((n) => (
-                <span key={n} className={n <= view.mainNumber ? "reached" : ""}>
-                  {n}
-                </span>
-              ))}
-            </div>
+            {active && (
+              <div
+                className="question-progress"
+                aria-label={`Main question ${view.mainNumber} of ${view.totalMainQuestions}`}
+              >
+                {[1, 2, 3].map((n) => (
+                  <span
+                    key={n}
+                    className={n <= view.mainNumber ? "reached" : ""}
+                    aria-current={n === view.mainNumber ? "step" : undefined}
+                  >
+                    {n}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
-          <p className="eyebrow room-position">
-            Live conversation · Main question {view.mainNumber} of 3
-            {view.followUpNumber > 0
-              ? ` · Follow-up ${view.followUpNumber} of 2`
-              : ""}
-          </p>
           {view.dataMode === "illustrative" && (
             <p className="fixture">
               Illustrative research context · not verified research.
             </p>
           )}
           {active && (
-            <section className="conversation-stage">
-              <div
-                className={`voice-emblem ${connected && !muted && status.includes("speaking") ? "is-speaking" : ""}`}
-                aria-hidden="true"
+            <>
+              <section
+                className="conversation-stage"
+                aria-label="Voice conversation"
               >
-                <span />
-                <span />
-                <span />
-                <span />
-                <span />
-              </div>
-              <p className="eyebrow">
-                {muted ? "MICROPHONE MUTED" : busy ? "THINKING IT THROUGH" : connected ? (status.includes("speaking") ? "YOUR INTERVIEWER" : "YOUR TURN") : "TAKE A BREATH. YOU’VE GOT THIS."}
-              </p>
-              <h1 className="question-heading">{view.currentQuestion?.text}</h1>
-              <p className="fine">{view.currentQuestion?.sourceLabel}</p>
-              <p>
-                Just talk. Ask me to clarify, explore an idea, or take a moment
-                to think.
-              </p>
-            </section>
-          )}
-          <p role="status" className="live-status">
-            {busy
-              ? "Considering your answer…"
-              : connecting
-                ? "Connecting live audio…"
-                : connected
-                  ? status
-                  : active
-                    ? "Ready when you are"
-                    : "Interview ended"}
-          </p>
-          {partial && (
-            <p className="transcript" aria-label="Live transcript">
-              {partial}
-            </p>
-          )}
-          <div className="live-controls">
-            {active && !connected && (
-              <button
-                className="primary"
-                disabled={connecting || busy}
-                onClick={() => void connect()}
-              >
-                {connecting ? "Connecting…" : "Start conversation"}
-              </button>
-            )}
-            {connecting && (
-              <button onClick={disconnect}>Cancel connection</button>
-            )}
-            {connected && active && (
-              <>
-                <button
-                  aria-pressed={muted}
-                  onClick={() => {
-                    audio.current?.mute(!muted);
-                    setMuted(!muted);
-                  }}
+                <div
+                  className={`voice-emblem ${roomState === "speaking" || roomState === "listening" ? "is-speaking" : ""}`}
+                  aria-hidden="true"
                 >
-                  {muted ? "Unmute microphone" : "Mute microphone"}
+                  <span />
+                  <span />
+                  <span />
+                  <span />
+                  <span />
+                </div>
+                <p className="eyebrow">
+                  {roomState === "paused"
+                    ? "MICROPHONE OFF"
+                    : roomState === "thinking" || roomState === "finishing"
+                      ? "SAVING YOUR WORDS"
+                      : `MAIN QUESTION ${view.mainNumber} OF 3`}
+                </p>
+                <h1 className="room-heading">{roomTitle}</h1>
+                <p className="room-guidance">
+                  {paused
+                    ? "Your place is saved. Select Resume when you’re ready."
+                    : "Just talk. You can think aloud, ask for clarification, or take a moment."}
+                </p>
+                <p className="fine">
+                  Your feedback and scores arrive after you finish.
+                </p>
+              </section>
+              <p role="status" className="live-status">
+                {finishing
+                  ? "Saving your last words and preparing your report…"
+                  : connecting
+                    ? "Connecting audio…"
+                    : paused
+                      ? "Paused · microphone off"
+                      : busy
+                        ? "Considering your answer…"
+                        : connected
+                          ? status
+                          : "Ready to start your conversation"}
+              </p>
+              <div className="live-controls" aria-label="Interview controls">
+                {connected && !paused ? (
+                  <button
+                    disabled={finishing}
+                    onClick={() => void room.pause()}
+                  >
+                    Pause
+                  </button>
+                ) : (
+                  <button
+                    className="primary"
+                    disabled={
+                      connecting || busy || finishing || pending.length > 0
+                    }
+                    onClick={() => void room.resume()}
+                  >
+                    {connecting
+                      ? "Connecting…"
+                      : paused
+                        ? "Resume"
+                        : "Start conversation"}
+                  </button>
+                )}
+                <button
+                  disabled={!connected || paused || busy || finishing}
+                  onClick={() => room.repeat()}
+                >
+                  Repeat
                 </button>
-                <button onClick={() => audio.current?.speak(view.spokenText)}>
-                  Repeat interviewer
+                <button
+                  className="finish-interview"
+                  disabled={finishing || connecting}
+                  onClick={() => void room.finish()}
+                >
+                  {finishing
+                    ? "Finishing…"
+                    : finishFailed
+                      ? "Retry finish"
+                      : "Finish & review"}
                 </button>
-                <button onClick={disconnect}>Disconnect audio</button>
-              </>
-            )}
-            {active && (
-              <button disabled={busy} onClick={() => void end()}>
-                End interview
-              </button>
-            )}
-          </div>
+              </div>
+              {connecting && (
+                <button
+                  className="quiet-control"
+                  onClick={() => void room.pause(false)}
+                >
+                  Cancel connection
+                </button>
+              )}
+              <p className="voice-command-hint">
+                Try “repeat”, “pause”, or “finish interview”. Say “I’m done” to
+                hand back the conversation.
+              </p>
+            </>
+          )}
           {error && (
             <div role="alert" className="error">
-              {error}
+              <p>{error}</p>
               {connected && (
-                <button
-                  onClick={() =>
-                    void audioElement.current
-                      ?.play()
-                      .catch(() =>
-                        setError(
-                          "Your browser blocked playback. Check its audio permissions.",
-                        ),
-                      )
-                  }
-                >
-                  Enable interviewer audio
+                <button onClick={() => room.enablePlayback()}>
+                  Enable audio playback
+                </button>
+              )}
+              {finishFailed && !active && (
+                <button disabled={finishing} onClick={() => void room.finish()}>
+                  Retry finishing
                 </button>
               )}
             </div>
@@ -465,47 +231,94 @@ export default function LiveInterview({ id }: { id: string }) {
               aria-label="Unsaved conversation"
             >
               <h2>{busy ? "Saving your words" : "Your words are preserved"}</h2>
-              <p className="transcript">{pending[0].transcript}</p>
+              {pending[0].kind !== "control" && (
+                <p className="transcript">{pending[0].transcript}</p>
+              )}
               {!busy && (
                 <>
                   <p>
-                    The microphone is paused after an error. Retry the same
-                    request, then unmute. If you continued a previous answer
-                    while feedback was loading, you can add these words to that
-                    answer.
+                    Your microphone is off. Save the pending conversation before
+                    resuming or reviewing.
                   </p>
-                  <button onClick={() => void processQueue()}>
+                  <button onClick={() => void room.retry()}>
                     Retry saving
                   </button>
-                  {pending[0].kind === "utterance" &&
-                    view.messages.some(
-                      (m) => m.role === "candidate" && m.kind === "answer",
-                    ) && (
-                      <button onClick={appendPendingToLastAnswer}>
-                        Add to my previous answer
-                      </button>
-                    )}
                 </>
               )}
             </section>
           )}
-          {latestFeedback && (
-            <section className="live-notes">
-              <h2>Latest coaching notes</h2>
-              <p>{latestFeedback.text}</p>
-              <p className="fine">
-                Notes update after each answer. Combined scores appear when all
-                three main questions are complete.
+          {view.report && (
+            <>
+              <section
+                className="recap-controls"
+                aria-label="Spoken interview recap"
+              >
+                <div>
+                  <p className="eyebrow">YOUR DEBRIEF</p>
+                  <p>
+                    {recapPlaying
+                      ? "Your spoken recap · microphone off"
+                      : "Listen to a short recap, or explore your report below."}
+                  </p>
+                </div>
+                <button
+                  disabled={
+                    (finishing && !recapPlaying) ||
+                    (finishFailed && !recapPlaying)
+                  }
+                  onClick={() =>
+                    recapPlaying || connecting
+                      ? room.disconnect()
+                      : void room.playRecap()
+                  }
+                >
+                  {recapPlaying || connecting ? "Skip recap" : "Play recap"}
+                </button>
+              </section>
+              <section className="live-report">
+                <ReportView report={view.report} />
+              </section>
+            </>
+          )}
+          {view.status === "cancelled" && (
+            <section className="empty-interview">
+              <h1>Your interview has ended</h1>
+              <p>
+                No answers were assessed, so there is no score to show. You can
+                start again whenever you’re ready.
               </p>
+              <Link className="primary" href="/">
+                Start another interview
+              </Link>
             </section>
           )}
-          <details open={editing !== null} className="live-history">
-            <summary>Conversation history ({view.messages.length})</summary>
+          <details
+            className="live-history"
+            open={editing !== null || undefined}
+          >
+            <summary>
+              {active
+                ? "Question, captions & transcript"
+                : "Review & correct your transcript"}
+            </summary>
+            {active && (
+              <section className="current-prompt">
+                <p className="eyebrow">
+                  CURRENT QUESTION
+                  {view.followUpNumber
+                    ? ` · FOLLOW-UP ${view.followUpNumber}`
+                    : ""}
+                </p>
+                <h2>{view.currentQuestion?.text}</h2>
+                <p className="fine">{view.currentQuestion?.sourceLabel}</p>
+                <p className="transcript" aria-label="Live captions">
+                  {partial || "Your words appear here as you speak."}
+                </p>
+              </section>
+            )}
             <p className="fine">
-              Transcripts are assessed automatically. Correct recognition
-              mistakes here; the assessment updates without advancing the
-              interview. Earlier spoken feedback remains in the conversation
-              history.
+              Correct recognition mistakes below. Corrections update the
+              assessment without advancing the interview.
             </p>
             {view.messages.map((message) => (
               <article
@@ -514,19 +327,18 @@ export default function LiveInterview({ id }: { id: string }) {
               >
                 <p className="eyebrow">
                   {message.role === "candidate" ? "You" : "Interviewer"} ·
-                  Question {message.mainNumber} · {message.kind}
+                  Question {message.mainNumber}
                 </p>
                 <p className="transcript">{message.text}</p>
                 {message.role === "candidate" &&
                   message.kind === "answer" &&
                   view.status !== "cancelled" && (
                     <button
-                      disabled={busy || pending.length > 0}
-                      onClick={() => {
-                        audio.current?.mute(true);
-                        setMuted(true);
-                        setEditing(message.id);
-                        setCorrection(message.text);
+                      disabled={busy || finishing || pending.length > 0}
+                      onClick={async () => {
+                        if (active) await room.pause(false);
+                        room.setEditing(message.id);
+                        room.setCorrection(message.text);
                       }}
                     >
                       Correct transcript
@@ -539,16 +351,18 @@ export default function LiveInterview({ id }: { id: string }) {
                       <textarea
                         value={correction}
                         maxLength={10000}
-                        onChange={(e) => setCorrection(e.target.value)}
+                        onChange={(event) =>
+                          room.setCorrection(event.target.value)
+                        }
                       />
                     </label>
                     <button
                       disabled={busy || !correction.trim()}
-                      onClick={saveCorrection}
+                      onClick={() => room.saveCorrection()}
                     >
-                      Save correction and reassess
+                      Save correction
                     </button>
-                    <button onClick={() => setEditing(null)}>
+                    <button onClick={() => room.setEditing(null)}>
                       Cancel correction
                     </button>
                   </div>
@@ -556,33 +370,31 @@ export default function LiveInterview({ id }: { id: string }) {
               </article>
             ))}
           </details>
-          {view.report && (
-            <section className="live-report">
-              <ReportView report={view.report} />
-            </section>
-          )}
-          {view.status === "cancelled" && (
-            <>
-              <h1>Interview ended</h1>
-              <p>
-                Your completed conversation remains available until this session
-                expires. A combined report requires completing all three main
-                questions.
-              </p>
-              <Link href="/">Start another interview</Link>
-            </>
-          )}
-          <button disabled={busy} onClick={() => void deleteSession()}>
-            Delete this session
-          </button>
-          <p className="fine">
-            AI-generated voice. While connected and unmuted, your microphone
-            streams to OpenAI. Transcripts are sent to Claude for feedback and
-            saved with your session. Provider retention may differ. Reconnects
-            resume saved progress.
-          </p>
-        </>
+          <details className="room-options">
+            <summary>Session options & privacy</summary>
+            <p className="fine">
+              AI-generated voice. While the microphone is on, audio streams to
+              OpenAI. Transcripts are assessed by Claude and saved with your
+              session. Pausing stops microphone capture. Provider retention may
+              differ.
+            </p>
+            {connected && active && (
+              <button
+                disabled={busy || finishing}
+                onClick={() => void room.pause(false).then(room.disconnect)}
+              >
+                Disconnect audio
+              </button>
+            )}
+            <button
+              disabled={busy || finishing || connecting}
+              onClick={() => void room.deleteSession()}
+            >
+              Delete this session
+            </button>
+          </details>
+        </div>
       )}
-    </AppShell>
+    </>
   );
 }

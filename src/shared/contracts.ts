@@ -30,6 +30,7 @@ export interface Evaluation {
   evidence: PrivateEvaluation['evidence']; strengths: string[]; weaknesses: string[]; improvements: string[]; suggestedAnswerOutline: string[];
 }
 export interface SessionReport {
+  coverage?: { answeredMainQuestions: number; plannedMainQuestions: number; finishedEarly: boolean };
   sessionId: string; status: 'completed'; completedAt: string; round: InterviewMode;
   overallScore: number; categoryAverages: Record<Category, number>;
   answers: { answerId: string; questionId: string; transcript: string; question: Question; evaluation: Evaluation }[];

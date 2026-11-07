@@ -1,4 +1,4 @@
-import { testUser } from './identity';
+import { testUser } from "./identity";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -9,6 +9,8 @@ import type { LiveRequest, LiveView } from "../src/shared/live";
 import type { CreateSessionResponse } from "../src/shared/contracts";
 import { AppError } from "../src/server/errors";
 import { hashToken } from "../src/server/auth";
+import { realtimeConfig } from "../src/server/realtime";
+import type { LiveState } from "../src/server/live/service";
 let failNext = false;
 let db: TestDatabase;
 let api: ReturnType<typeof createApi>;
@@ -167,7 +169,7 @@ beforeEach(async () => {
   ).json();
 });
 describe("live interview persistence and progression", () => {
-  it("covers three main kinds with two extra follow-ups each, coaching every answer and scores only at completion", async () => {
+  it("covers three main kinds with two extra follow-ups each, withholding all coaching and scores until completion", async () => {
     const kinds: string[] = [];
     const ids: string[] = [];
     for (let i = 0; i < 9; i++) {
@@ -176,10 +178,16 @@ describe("live interview persistence and progression", () => {
       const { response } = await utterance();
       expect(response.status).toBe(200);
       expect(view.messages.filter((m) => m.kind === "feedback")).toHaveLength(
-        i + 1,
+        0,
       );
       if (i < 8) {
         expect(view.report).toBeNull();
+        expect(JSON.stringify(view)).not.toContain(
+          "You explained your reasoning.",
+        );
+        expect(JSON.stringify(view)).not.toContain(
+          "Explain how you would verify your assumptions.",
+        );
         expect(JSON.stringify(view)).not.toMatch(
           /"overallScore":|"adaptiveNextAction":|"assessment_guidance":|"scores":|"expectedConcepts":/,
         );
@@ -198,6 +206,14 @@ describe("live interview persistence and progression", () => {
       "system_design",
     ]);
     expect(view.status).toBe("completed");
+    expect(view.report!.coverage).toEqual({
+      answeredMainQuestions: 3,
+      plannedMainQuestions: 3,
+      finishedEarly: false,
+    });
+    expect(view.spokenText).toContain(
+      "One strength: You explained your reasoning.",
+    );
     expect(view.report!.answers).toHaveLength(3);
     expect(
       view.report!.answers.every(
@@ -219,15 +235,34 @@ describe("live interview persistence and progression", () => {
       ).answers,
     ).toHaveLength(3);
   });
-  it.each(['behavioral', 'technical', 'system_design'])('keeps all live main questions and follow-ups in %s mode', async round => {
-    serial = 0;
-    const created = await api.create(request(undefined, { companyId: 'google', roleId: 'software-engineer', round, audioProcessingConsent: true }));
-    session = await created.json();
-    view = await (await api.live.get(request(session.sessionToken), session.sessionId)).json();
-    for (let i = 0; i < 9; i++) { expect(view.currentQuestion!.kind).toBe(round); expect((await utterance()).response.status).toBe(200); }
-    expect(view.report!.answers).toHaveLength(3);
-    expect(view.report!.answers.every(answer => answer.evaluation.questionKind === round)).toBe(true);
-  });
+  it.each(["behavioral", "technical", "system_design"])(
+    "keeps all live main questions and follow-ups in %s mode",
+    async (round) => {
+      serial = 0;
+      const created = await api.create(
+        request(undefined, {
+          companyId: "google",
+          roleId: "software-engineer",
+          round,
+          audioProcessingConsent: true,
+        }),
+      );
+      session = await created.json();
+      view = await (
+        await api.live.get(request(session.sessionToken), session.sessionId)
+      ).json();
+      for (let i = 0; i < 9; i++) {
+        expect(view.currentQuestion!.kind).toBe(round);
+        expect((await utterance()).response.status).toBe(200);
+      }
+      expect(view.report!.answers).toHaveLength(3);
+      expect(
+        view.report!.answers.every(
+          (answer) => answer.evaluation.questionKind === round,
+        ),
+      ).toBe(true);
+    },
+  );
   it("clarifies and repeats without scoring or using a follow-up", async () => {
     const prompt = view.currentQuestion!.id;
     const before = calls;
@@ -235,7 +270,7 @@ describe("live interview persistence and progression", () => {
     await utterance("repeat");
     expect(view.currentQuestion!.id).toBe(prompt);
     expect(view.followUpNumber).toBe(0);
-    expect(calls - before).toBe(2);
+    expect(calls - before).toBe(1);
     expect(view.messages.some((m) => m.kind === "answer")).toBe(false);
     expect(view.spokenText).toBe(view.currentQuestion!.text);
   });
@@ -416,5 +451,227 @@ describe("live interview persistence and progression", () => {
       p_lease: lease,
     });
     expect((await utterance()).response.status).toBe(200);
+  });
+});
+
+async function control(action: "repeat" | "pause" | "finish") {
+  const input: LiveRequest = {
+    kind: "control",
+    clientRequestId: randomUUID(),
+    revision: view.revision,
+    action,
+  };
+  const response = await api.live.turn(
+    request(session.sessionToken, input),
+    session.sessionId,
+  );
+  const result = await response.json();
+  if (response.ok) view = result;
+  return { response, result, input };
+}
+
+describe("conversation controls and end-only feedback", () => {
+  it("pauses and repeats without assessment or advancement, and deduplicates controls", async () => {
+    const questionId = view.currentQuestion!.id;
+    const before = calls;
+    const paused = await control("pause");
+    expect(view.control).toBe("pause");
+    const replay = await api.live.turn(
+      request(session.sessionToken, paused.input),
+      session.sessionId,
+    );
+    expect(await replay.json()).toEqual(paused.result);
+    await control("repeat");
+    expect(view.control).toBeUndefined();
+    expect(view.currentQuestion!.id).toBe(questionId);
+    expect(
+      view.messages.filter((message) => message.kind === "answer"),
+    ).toHaveLength(0);
+    expect(calls).toBe(before);
+    expect(view.report).toBeNull();
+  });
+  it("finishes early with a persisted report averaged over answered groups only", async () => {
+    for (let i = 0; i < 3; i++) await utterance();
+    expect(view.mainNumber).toBe(2);
+    const { response, input, result } = await control("finish");
+    expect(response.status).toBe(200);
+    expect(view.report!.answers).toHaveLength(1);
+    expect(view.report!.coverage).toEqual({
+      answeredMainQuestions: 1,
+      plannedMainQuestions: 3,
+      finishedEarly: true,
+    });
+    expect(view.report!.overallScore).toBe(
+      view.report!.answers[0].evaluation.overallScore,
+    );
+    expect(view.report!.categoryAverages.content).toBe(70);
+    expect(view.spokenText).toContain("You finished early");
+    expect(view.spokenText).toContain("One strength");
+    expect((await db.snapshot(session.sessionId))!.report).toEqual(view.report);
+    expect(
+      await (
+        await api.live.turn(
+          request(session.sessionToken, input),
+          session.sessionId,
+        )
+      ).json(),
+    ).toEqual(result);
+    expect(
+      await (
+        await api.live.get(request(session.sessionToken), session.sessionId)
+      ).json(),
+    ).toEqual(view);
+  });
+  it("finishes with zero answers without manufacturing a score and can retry", async () => {
+    const { response, input } = await control("finish");
+    expect(response.status).toBe(200);
+    expect(view.status).toBe("cancelled");
+    expect(view.report).toBeNull();
+    expect((await db.snapshot(session.sessionId))!.session.status).toBe(
+      "cancelled",
+    );
+    expect(
+      (
+        await api.live.turn(
+          request(session.sessionToken, input),
+          session.sessionId,
+        )
+      ).status,
+    ).toBe(200);
+    expect(
+      (await api.report(request(session.sessionToken), session.sessionId))
+        .status,
+    ).toBe(409);
+  });
+  it("recognizes spoken controls but retains command-like narrative as answer evidence", async () => {
+    await utterance("Can you pause the interview please?");
+    expect(view.control).toBe("pause");
+    expect(
+      view.messages.filter((message) => message.kind === "answer"),
+    ).toHaveLength(0);
+    await utterance(
+      "I asked my teammate to pause the interview process and finish the project first.",
+    );
+    expect(
+      view.messages.filter((message) => message.kind === "answer"),
+    ).toHaveLength(1);
+    await utterance("Finish interview.");
+    expect(view.status).toBe("completed");
+    expect(view.report!.answers).toHaveLength(1);
+  });
+  it("keeps corrections private, then refreshes the report and recap after early completion", async () => {
+    await utterance();
+    const answerId = view.messages.find(
+      (message) => message.kind === "answer",
+    )!.id;
+    const correct = async (transcript: string) => {
+      const response = await api.live.turn(
+        request(session.sessionToken, {
+          kind: "correct",
+          clientRequestId: randomUUID(),
+          revision: view.revision,
+          answerId,
+          transcript,
+        }),
+        session.sessionId,
+      );
+      expect(response.status).toBe(200);
+      view = await response.json();
+    };
+    await correct("corrected transcript with details");
+    expect(view.messages.some((message) => message.kind === "feedback")).toBe(
+      false,
+    );
+    expect(JSON.stringify(view)).not.toContain("You explained your reasoning.");
+    await control("finish");
+    const score = view.report!.overallScore;
+    await correct("I measured the actual result.");
+    expect(view.report!.overallScore).toBeLessThan(score);
+    expect(view.spokenText).toContain(
+      `${view.report!.overallScore} out of 100`,
+    );
+    expect((await db.snapshot(session.sessionId))!.report).toEqual(view.report);
+  });
+  it("filters legacy coaching on restore and on successful cached retries", async () => {
+    const { input } = await utterance();
+    const saved = await db.rpc<LiveState>("read_live", {
+      p_session_id: session.sessionId,
+    });
+    const feedback = {
+      ...saved.messages[0],
+      id: randomUUID(),
+      kind: "feedback" as const,
+      text: "PRIVATE COACHING FROM AN OLD SESSION",
+    };
+    saved.messages.push(feedback);
+    saved.spokenText = feedback.text;
+    await db.sql.query(
+      "update live_interviews set state=$2 where session_id=$1",
+      [session.sessionId, JSON.stringify(saved)],
+    );
+    const staleResponse = {
+      ...view,
+      messages: saved.messages,
+      spokenText: saved.spokenText,
+    };
+    await db.sql.query(
+      "update live_requests set response=$3 where session_id=$1 and request_id=$2",
+      [session.sessionId, input.clientRequestId, JSON.stringify(staleResponse)],
+    );
+    const restored = await (
+      await api.live.get(request(session.sessionToken), session.sessionId)
+    ).json();
+    const replay = await (
+      await api.live.turn(
+        request(session.sessionToken, input),
+        session.sessionId,
+      )
+    ).json();
+    for (const response of [restored, replay]) {
+      expect(JSON.stringify(response)).not.toContain(feedback.text);
+      expect(response.spokenText).toBe(view.currentQuestion!.text);
+      expect(response.report).toBeNull();
+    }
+  });
+  it("issues recap credentials only for completed reports and disables input turn detection", async () => {
+    expect(
+      (
+        await api.live.token(
+          request(session.sessionToken, { purpose: "recap" }),
+          session.sessionId,
+        )
+      ).status,
+    ).toBe(409);
+    await utterance();
+    await control("finish");
+    expect(
+      (await api.live.token(request(session.sessionToken), session.sessionId))
+        .status,
+    ).toBe(409);
+    expect(
+      (
+        await api.live.token(
+          request(session.sessionToken, { purpose: "recap" }),
+          session.sessionId,
+        )
+      ).status,
+    ).toBe(200);
+    const config = realtimeConfig(
+      (await db.snapshot(session.sessionId))!,
+      "test-voice",
+      "test-transcription",
+      "recap",
+    );
+    expect(config.audio.input.turn_detection).toBeNull();
+    expect(config.audio.input).not.toHaveProperty("transcription");
+    expect(config.instructions).toContain("Your practice score");
+    expect(
+      (
+        await api.live.token(
+          request(undefined, { purpose: "recap" }),
+          session.sessionId,
+        )
+      ).status,
+    ).toBe(401);
   });
 });

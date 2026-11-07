@@ -15,7 +15,7 @@ import type { Database, Forecast, Snapshot } from './storage/types';
 import { requireUser, type Authenticator } from './oauth/identity';
 export interface ApiDependencies {
   db: Database; ai: () => StructuredAI; dataMode: Forecast['data_mode']; rateSalt: string; dailyLimit: number;
-  realtime: (state: Snapshot) => Promise<unknown>;
+  realtime: (state: Snapshot, purpose?: "interview" | "recap") => Promise<unknown>;
   authenticate?: Authenticator;
 }
 export function createApi(deps: ApiDependencies) {

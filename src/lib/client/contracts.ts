@@ -33,6 +33,7 @@ export interface AnswerResult {
   evaluation: Evaluation;
 }
 export interface SessionReport {
+  coverage?: { answeredMainQuestions: number; plannedMainQuestions: number; finishedEarly: boolean };
   sessionId: string;
   status: "completed";
   completedAt: string;

@@ -64,10 +64,23 @@ export function AnswerFeedback({ answer }: { answer: AnswerResult }) {
   );
 }
 export function ReportView({ report }: { report: SessionReport }) {
+  const answered =
+    report.coverage?.answeredMainQuestions ?? report.answers.length;
+  const planned = report.coverage?.plannedMainQuestions ?? 3;
+  const early = report.coverage?.finishedEarly ?? answered < planned;
   return (
     <>
-      <p className="eyebrow">Three questions, completed</p>
+      <p className="eyebrow">
+        {early ? "Finished early" : "Interview complete"} · {answered} of{" "}
+        {planned} main questions answered
+      </p>
       <h1>A few notes for next time</h1>
+      {early && (
+        <p className="report-coverage">
+          This report covers the answers you gave, including follow-ups.
+          Unanswered questions are excluded from your scores.
+        </p>
+      )}
       <div className="bigscore">
         {report.overallScore}
         <span>/ 100</span>

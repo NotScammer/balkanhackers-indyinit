@@ -9,6 +9,9 @@ export function clearInterviewStorage(storage: Storage) {
     "read:",
     "question-cache:",
     "live-pending:",
+    "live-draft:",
+    "live-paused:",
+    "live-finish:",
     "talk-to-future:",
   ];
   for (let index = storage.length - 1; index >= 0; index--) {

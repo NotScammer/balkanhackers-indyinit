@@ -11,6 +11,7 @@ export interface LiveAudioCallbacks {
   onError(message: string): void;
   onPlaybackEnd?(): void;
   onDisconnected?(): void;
+  onSpeech?(active: boolean): void;
 }
 export class LiveAudio {
   private peer: RTCPeerConnection | null = null;
@@ -26,32 +27,45 @@ export class LiveAudio {
   private contexts = new Map<string, string | null>();
   private transcripts = new Map<string, string>();
   private seen = new Set<string>();
+  private sender: RTCRtpSender | null = null;
+  private capturingSpeech = false;
+  private inputFailure = false;
+  private recoveringInput = false;
+  private inputWaiters = new Set<() => void>();
   constructor(
     private element: HTMLAudioElement,
     private callbacks: LiveAudioCallbacks,
   ) {}
-  async connect(secret: string, openingText: string) {
+  async connect(secret: string, openingText: string, input = true) {
     this.close();
     const generation = this.generation;
     const current = () => generation === this.generation;
-    this.callbacks.onStatus("Opening microphone");
+    this.callbacks.onStatus(
+      input ? "Opening microphone" : "Preparing your recap",
+    );
     try {
-      const stream = await acquireMicrophone(
-        () =>
-          navigator.mediaDevices.getUserMedia({
-            audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true,
-            },
-          }),
-        current,
-      );
+      const stream = input
+        ? await acquireMicrophone(
+            () =>
+              navigator.mediaDevices.getUserMedia({
+                audio: {
+                  echoCancellation: true,
+                  noiseSuppression: true,
+                  autoGainControl: true,
+                },
+              }),
+            current,
+          )
+        : null;
       if (!current()) return;
       this.stream = stream;
       const peer = new RTCPeerConnection();
       this.peer = peer;
-      stream.getAudioTracks().forEach((track) => peer.addTrack(track, stream));
+      if (stream)
+        stream.getAudioTracks().forEach((track) => {
+          this.sender = peer.addTrack(track, stream);
+        });
+      else peer.addTransceiver("audio", { direction: "recvonly" });
       peer.ontrack = (event) => {
         if (!current()) return;
         this.element.srcObject =
@@ -80,7 +94,7 @@ export class LiveAudio {
       this.channel = channel;
       channel.onopen = () => {
         if (current()) {
-          this.callbacks.onStatus("Listening");
+          this.callbacks.onStatus(input ? "Listening" : "Playing your recap");
           this.speak(openingText);
         }
       };
@@ -167,6 +181,8 @@ export class LiveAudio {
   }) {
     const id = event.item_id;
     if (event.type === "input_audio_buffer.speech_started") {
+      this.capturingSpeech = true;
+      this.callbacks.onSpeech?.(true);
       if (id) this.contexts.set(id, this.callbacks.questionId());
       this.speechQueue = null;
       if (this.responseActive) this.send({ type: "response.cancel" });
@@ -174,6 +190,10 @@ export class LiveAudio {
         this.send({ type: "output_audio_buffer.clear" });
       this.awaitingPlayback = false;
       this.callbacks.onStatus("Listening to you");
+    }
+    if (event.type === "input_audio_buffer.speech_stopped") {
+      this.capturingSpeech = false;
+      this.callbacks.onSpeech?.(false);
     }
     if (
       event.type === "input_audio_buffer.committed" &&
@@ -201,14 +221,18 @@ export class LiveAudio {
       id
     ) {
       this.transcripts.set(id, "");
+      this.inputFailure = true;
       this.drain();
       this.callbacks.onError(
         "That audio could not be transcribed. Please repeat it.",
       );
     }
     if (event.type === "response.created") this.responseActive = true;
-    if (event.type === "output_audio_buffer.started")
-      this.callbacks.onStatus("Interviewer speaking â€” you can interrupt");
+    if (event.type === "output_audio_buffer.started") {
+      this.playing = true;
+      this.awaitingPlayback = false;
+      this.callbacks.onStatus("Interviewer speaking — you can interrupt");
+    }
     if (
       event.type === "output_audio_buffer.stopped" ||
       event.type === "output_audio_buffer.cleared"
@@ -253,15 +277,22 @@ export class LiveAudio {
       const transcript = this.transcripts.get(id)!;
       this.transcripts.delete(id);
       this.seen.add(id);
-      if (transcript)
+      if (transcript) {
+        if (this.recoveringInput) {
+          this.inputFailure = false;
+          this.recoveringInput = false;
+        }
         this.callbacks.onTranscript(
           id,
           transcript,
           this.contexts.get(id) ?? null,
         );
+      }
       this.contexts.delete(id);
       this.callbacks.onPartial("");
     }
+    if (!this.contexts.size && !this.order.length)
+      this.inputWaiters.forEach((resolve) => resolve());
   }
   speak(text: string) {
     if (this.channel?.readyState !== "open" || !text) return;
@@ -291,6 +322,83 @@ export class LiveAudio {
     if (value) this.send({ type: "input_audio_buffer.clear" });
     this.callbacks.onStatus(value ? "Microphone muted" : "Listening");
   }
+  stopPlayback() {
+    this.speechQueue = null;
+    if (this.responseActive) this.send({ type: "response.cancel" });
+    if (this.playing || this.awaitingPlayback)
+      this.send({ type: "output_audio_buffer.clear" });
+    this.playing = false;
+    this.awaitingPlayback = false;
+  }
+  stopMicrophone() {
+    this.stream?.getTracks().forEach((track) => track.stop());
+    this.stream = null;
+  }
+  async settleInput() {
+    const generation = this.generation;
+    this.stopMicrophone();
+    this.stopPlayback();
+    if (this.capturingSpeech) {
+      this.send({ type: "input_audio_buffer.commit" });
+      this.capturingSpeech = false;
+    }
+    if (this.contexts.size || this.order.length)
+      await new Promise<void>((resolve, reject) => {
+        const done = () => {
+          clearTimeout(timer);
+          this.inputWaiters.delete(done);
+          resolve();
+        };
+        const timer = setTimeout(() => {
+          this.inputWaiters.delete(done);
+          reject(
+            Error(
+              "Still waiting for your last words to be transcribed. Retry before finishing.",
+            ),
+          );
+        }, 15000);
+        this.inputWaiters.add(done);
+      });
+    if (generation !== this.generation)
+      throw Error(
+        "Audio disconnected before your last words were saved. Reconnect and repeat any missing words.",
+      );
+    if (this.inputFailure) {
+      throw Error(
+        "Some audio could not be transcribed. Resume and repeat the missing words before finishing.",
+      );
+    }
+  }
+  async resumeInput() {
+    const generation = this.generation;
+    const stream = await acquireMicrophone(
+      () =>
+        navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        }),
+      () => generation === this.generation,
+    );
+    if (generation !== this.generation) return;
+    try {
+      if (!this.sender) throw Error("Reconnect to resume your microphone.");
+      await this.sender.replaceTrack(stream.getAudioTracks()[0]);
+      if (generation !== this.generation) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      this.stream = stream;
+      this.muted = false;
+      this.recoveringInput = this.inputFailure;
+      this.callbacks.onStatus("Listening");
+    } catch (error) {
+      stream.getTracks().forEach((track) => track.stop());
+      throw error;
+    }
+  }
   close() {
     this.generation++;
     if (this.channel) {
@@ -305,6 +413,10 @@ export class LiveAudio {
     }
     this.stream?.getTracks().forEach((track) => track.stop());
     this.stream = null;
+    this.sender = null;
+    this.capturingSpeech = false;
+    this.inputFailure = false;
+    this.recoveringInput = false;
     this.element.pause();
     this.element.srcObject = null;
     this.responseActive = false;
@@ -315,5 +427,7 @@ export class LiveAudio {
     this.contexts.clear();
     this.transcripts.clear();
     this.seen.clear();
+    this.inputWaiters.forEach((resolve) => resolve());
+    this.inputWaiters.clear();
   }
 }

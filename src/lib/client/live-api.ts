@@ -8,10 +8,10 @@ export const liveApi = {
       { method: "POST", body: JSON.stringify(input) },
       id,
     ),
-  token: (id: string) =>
+  token: (id: string, purpose: "interview" | "recap" = "interview") =>
     request<{ clientSecret: string; expiresAt: string }>(
       `/sessions/${id}/live/token`,
-      { method: "POST" },
+      { method: "POST", body: JSON.stringify({ purpose }) },
       id,
     ),
   end: (id: string) => request(`/sessions/${id}/end`, { method: "POST" }, id),
