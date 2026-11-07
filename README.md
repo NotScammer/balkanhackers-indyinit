@@ -1,5 +1,25 @@
 # AI Interview Simulator
 
+> **Backend update:** The implemented dynamic, research-grounded backend contract supersedes conflicting older MVP sections below. See [Backend architecture](docs/BACKEND_ARCHITECTURE.md), [Frontend integration](docs/FRONTEND_INTEGRATION.md), and [setup/migrations/deployment](docs/SETUP.md). Feedback stays private until completion; submit answers to `/api/v1/sessions/:sessionId/turns/complete`.
+
+## Integrated app: deployment
+
+Both branches are integrated into one Next.js website. The voice interface uses the same-origin backend for questions, recordings, per-turn feedback, refresh recovery and final reports.
+
+1. Use Node.js 22.12+ and run `npm ci`.
+2. Copy `.env.example` to `.env.local`. Configure Supabase, Claude and OpenAI keys/models, plus `RATE_LIMIT_SALT`. Set `NEXT_PUBLIC_USE_MOCK_API=false` before building.
+3. Apply both SQL migrations and seed forecasts using [docs/SETUP.md](docs/SETUP.md). Question generation requires seeded research.
+4. Run `npm test`, `npm run lint`, `npm run typecheck`, and `npm run build`.
+5. Run `npm start`, or deploy the repository as a Next.js project on Vercel with the same environment settings. Configure the database and seed before opening access.
+
+For other Node hosts, use `npm run build` then `npm start`. Docker is also supported: `docker build -t interview-practice .` then `docker run --env-file .env.local -p 3000:3000 interview-practice`. The image builds the live frontend and takes secrets only at runtime. Voice requires HTTPS outside localhost.
+
+Set `OPENAI_TTS_MODEL` and `OPENAI_TRANSCRIPTION_MODEL` to account-supported audio models. `OPENAI_TTS_VOICE` defaults to `alloy` when blank. Realtime settings are only needed by optional Realtime clients. Audio uploads are capped at 4 MiB; shorten larger recordings. Audio is not stored by this application. Provider retention may differ.
+
+Live adaptive questions are generated between assessed turns. Scripted clarification remains fixture-only. Accounts are labeled previews; guest sessions use private capability tokens. Session expiry blocks access; physical database cleanup must be configured separately. Live microphone/provider behavior and hosted database setup still require verification with deployment credentials.
+
+The specification below records the original plan. See [FRONTEND.md](FRONTEND.md) for the current voice-only interface.
+
 A hackathon project that helps candidates practice role-specific interviews, speak with an AI interviewer about technical and behavioral topics, and receive actionable feedback. System design is supported; coding questions are excluded.
 
 This README is the shared implementation specification for two developers and their coding assistants, including Codex and Claude Code. It describes the intended build; it does not claim that any feature is already implemented.

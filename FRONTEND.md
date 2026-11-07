@@ -33,3 +33,7 @@ Lint, TypeScript, 21 automated tests, and production build pass. Existing tests 
 Browser verified the new consent-based setup, voice-only screen, microphone control, absence of typed answer fields, dark layout, and browser question speech entering its speaking state. The prior browser pass verified the three-turn report/feedback flow and narrow layout. Actual microphone capture, transcription, live scoring, and a complete real spoken session remain unverified until the backend audio providers are available. Real authentication and guest-to-account migration are separate integration work.
 
 Run: `npm ci`, copy `.env.example` to `.env.local`, and `npm run dev`. No dependencies were added for this change. The generated Next.js environment declarations may change between development and production builds; avoid committing incidental changes to them.
+
+## Merged backend
+
+The live recording, per-turn feedback and refresh recovery endpoints are now implemented. Follow the README deployment section. Full microphone and provider verification remains pending deployment credentials.

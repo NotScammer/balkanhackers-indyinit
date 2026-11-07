@@ -36,7 +36,7 @@ async function request<T>(
     ...init,
     headers,
     cache: "no-store",
-    signal: AbortSignal.timeout(90000),
+    signal: AbortSignal.timeout(180000),
   });
   if (!response.ok) {
     let code = "REQUEST_FAILED",
