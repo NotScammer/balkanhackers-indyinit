@@ -40,7 +40,7 @@ export default function AppShell({
       </div>
       <footer>
         <span>Voice interview practice.</span>
-        <span>No coding questions. No company endorsement.</span>
+        <span>Explore interview processes. Practice out loud.</span>
         <ThemeToggle />
       </footer>
     </main>

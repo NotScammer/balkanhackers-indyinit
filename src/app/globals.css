@@ -1634,3 +1634,472 @@ html[data-theme="light"] blockquote,
 html[data-theme="light"] .transcript {
   color: #525b70;
 }
+
+/* Company process library and the research outlook. */
+.explore-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+.explore-navigation a {
+  display: inline-flex;
+  align-items: center;
+  gap: 22px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 11px 16px;
+  text-decoration: none;
+  font-size: 12px;
+}
+.explore-navigation a.active {
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+  border-color: color-mix(in srgb, var(--green) 40%, var(--line));
+}
+.explore-navigation a:hover {
+  border-color: var(--green);
+}
+.history-section,
+.future-section,
+.selection-checkout {
+  scroll-margin-top: 28px;
+}
+.history-section {
+  padding-top: 20px;
+}
+.section-label,
+.research-label {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+.section-description {
+  color: var(--muted);
+  max-width: 760px;
+  font-size: 13px;
+  margin: -7px 0 24px;
+}
+.company-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 32px;
+}
+.company-filters button {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 8px 13px;
+  font-size: 12px;
+  border-color: var(--line);
+  color: var(--muted);
+  border-radius: 100px;
+}
+.company-filters button[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--green) 13%, var(--paper));
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--green) 50%, var(--line));
+}
+.company-filters button span {
+  font-size: 10px;
+  opacity: 0.7;
+}
+.company-category {
+  margin-bottom: 34px;
+}
+.category-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.category-heading h3 {
+  font-size: 16px;
+  margin: 0;
+}
+.category-heading p {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+}
+.company-grid,
+.roadmap-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+.company-grid .company-group {
+  display: flex;
+  flex-direction: column;
+  padding: 22px;
+  border-radius: 15px;
+  align-self: stretch;
+}
+.company-grid h4 {
+  margin: 17px 0 3px;
+  font-size: 22px;
+  letter-spacing: -0.6px;
+}
+.company-grid .company-role {
+  font-size: 11px;
+  margin-bottom: 20px;
+}
+.history-badge {
+  font-size: 9px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  padding: 4px 8px;
+  border-radius: 100px;
+}
+.history-badge.pending {
+  border-style: dashed;
+}
+.process-scope {
+  color: var(--muted);
+  font-size: 10px;
+  margin: 0 0 5px;
+}
+.process-summary {
+  margin: 0 0 18px;
+  font-size: 12px;
+  font-weight: 550;
+  min-height: 38px;
+}
+.process-rounds {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px;
+  flex: 1;
+}
+.process-rounds li {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.process-rounds li:last-child {
+  margin-bottom: 0;
+}
+.round-count {
+  display: grid;
+  place-items: center;
+  flex: 0 0 29px;
+  height: 30px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--company-accent) 10%, transparent);
+  color: var(--company-accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+.process-rounds strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+}
+.process-rounds small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  margin-top: 2px;
+}
+.history-empty {
+  margin: 0 0 20px;
+  font-size: 12px;
+  color: var(--muted);
+  flex: 1;
+}
+.process-details {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.process-details summary,
+.roadmap-details summary {
+  cursor: pointer;
+  font-size: 11px;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.process-details summary::-webkit-details-marker,
+.roadmap-details summary::-webkit-details-marker {
+  display: none;
+}
+.process-details summary > span,
+.roadmap-details summary > span {
+  font-size: 17px;
+  transition: transform 0.2s;
+}
+.process-details[open] summary > span,
+.roadmap-details[open] summary > span {
+  transform: rotate(45deg);
+}
+.process-details p {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 10px 0 0;
+}
+.process-source {
+  display: grid;
+  gap: 4px;
+  font-size: 10px;
+  margin: 14px 0 17px;
+  overflow-wrap: anywhere;
+}
+.process-source a {
+  text-decoration: none;
+}
+.process-source a:hover,
+.roadmap-source a:hover {
+  text-decoration: underline;
+}
+.process-source > span {
+  color: var(--muted);
+  font-size: 9px;
+}
+.choose-company {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  margin: 0;
+  font-size: 11px;
+  border-color: var(--line);
+  border-radius: 8px;
+}
+.choose-company[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+  border-color: color-mix(in srgb, var(--green) 50%, var(--line));
+}
+.history-caption {
+  margin: 15px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+.selection-checkout {
+  margin: 38px 0 0;
+  align-items: start;
+}
+.selection-summary .practice-explanation {
+  margin-top: 20px;
+  max-width: 320px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+.practice-modes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 20px;
+}
+.practice-modes legend {
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+.practice-modes .company-interview {
+  padding: 10px;
+  min-width: 0;
+}
+.practice-modes .interview-copy small {
+  font-size: 10px;
+}
+.selection-start .check {
+  font-size: 12px;
+}
+.selection-start .check small {
+  display: block;
+  font-size: 10px;
+  margin-top: 4px;
+  color: var(--muted);
+}
+.selection-start .start-button {
+  width: 100%;
+  justify-content: space-between;
+}
+.selection-start .error p {
+  margin: 0;
+}
+.selection-start .fine {
+  margin-bottom: 0;
+  font-size: 11px;
+}
+.future-section {
+  margin-top: 70px;
+  border-top: 1px solid var(--line);
+  padding-top: 42px;
+}
+.research-label {
+  color: var(--green);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.research-label > span {
+  font-size: 22px;
+}
+.roadmap-card {
+  display: flex;
+  flex-direction: column;
+  align-self: start;
+  min-height: 430px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--paper) 75%, transparent);
+  min-width: 0;
+}
+.roadmap-topline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 0.6px;
+}
+.roadmap-topline > span:last-child {
+  font-size: 20px;
+  color: var(--green);
+}
+.roadmap-category {
+  color: var(--green);
+  font-size: 11px;
+  margin: 24px 0 7px;
+}
+.roadmap-card h3 {
+  margin: 0 0 16px;
+  font-size: 21px;
+  line-height: 1.35;
+  letter-spacing: -0.5px;
+}
+.skill-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.skill-tags span {
+  font-size: 9px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 3px 6px;
+}
+.roadmap-rationale {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 18px 0 22px;
+  flex: 1;
+}
+.roadmap-details {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.roadmap-details summary {
+  font-size: 12px;
+}
+.roadmap-details ol {
+  padding-left: 18px;
+  margin: 18px 0;
+  font-size: 11px;
+}
+.roadmap-details li {
+  padding-left: 3px;
+  margin-bottom: 16px;
+}
+.roadmap-details li::marker {
+  color: var(--green);
+}
+.roadmap-details li strong {
+  font-weight: 550;
+}
+.roadmap-details li p {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+.future-question {
+  background: color-mix(in srgb, var(--green) 8%, transparent);
+  padding: 13px;
+  border-radius: 8px;
+}
+.future-question .eyebrow {
+  font-size: 8px;
+  color: var(--green);
+}
+.future-question p {
+  font-size: 12px;
+  margin: 7px 0 0;
+}
+.roadmap-source {
+  display: grid;
+  gap: 4px;
+  margin-top: 20px;
+  font-size: 10px;
+}
+.roadmap-source > span {
+  font-size: 9px;
+  color: var(--muted);
+}
+.roadmap-source a {
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1050px) {
+  .company-grid,
+  .roadmap-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .company-browser-heading {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+}
+@media (max-width: 700px) {
+  .company-grid,
+  .roadmap-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .category-heading {
+    flex-direction: column;
+    gap: 3px;
+  }
+  .company-filters {
+    gap: 7px;
+  }
+  .company-filters button {
+    padding: 8px 11px;
+    font-size: 11px;
+  }
+  .explore-navigation {
+    flex-direction: column;
+  }
+  .explore-navigation a {
+    justify-content: space-between;
+  }
+  .company-browser-heading h2 {
+    font-size: 22px;
+  }
+  .section-description {
+    font-size: 12px;
+    margin-top: 0;
+  }
+  .selection-checkout {
+    margin-top: 28px;
+  }
+  .future-section {
+    margin-top: 45px;
+    padding-top: 30px;
+  }
+  .roadmap-card {
+    min-height: 0;
+  }
+}
+@media (max-width: 380px) {
+  .practice-modes {
+    grid-template-columns: 1fr;
+  }
+}
