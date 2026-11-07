@@ -1,0 +1,516 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap");
+:root {
+  --ink: #243c35;
+  --muted: #65736b;
+  --green: #235d47;
+  --line: #dce1d7;
+  --paper: #fafbf7;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: #f0f2e9;
+  color: var(--ink);
+  font:
+    15px "DM Sans",
+    system-ui,
+    sans-serif;
+}
+main {
+  max-width: 1440px;
+  margin: auto;
+  padding: 0 5vw;
+}
+header {
+  height: 108px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+}
+a {
+  color: inherit;
+}
+button,
+a,
+input,
+select,
+textarea {
+  outline-offset: 4px;
+}
+button,
+a.primary {
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+button {
+  font: inherit;
+  border: 1px solid #cbd5c9;
+  background: var(--paper);
+  border-radius: 9px;
+  padding: 11px 17px;
+  color: var(--ink);
+}
+button:hover:not(:disabled) {
+  background: #e3ebde;
+}
+.brand {
+  font:
+    800 35px "Manrope",
+    sans-serif;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.brand > span {
+  font-size: 23px;
+  letter-spacing: -1px;
+}
+.badge {
+  background: #e5e9dc;
+  border-radius: 30px;
+  padding: 9px 14px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.3px;
+}
+.shell {
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  gap: 7vw;
+  margin: 66px 0 80px;
+}
+aside {
+  padding-top: 22px;
+  position: sticky;
+  top: 20px;
+  align-self: start;
+}
+.eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #52715c;
+}
+h1 {
+  font:
+    500 clamp(38px, 4.4vw, 64px)/1.12 "Manrope",
+    sans-serif;
+  letter-spacing: -2.6px;
+  margin: 24px 0;
+}
+h2 {
+  font:
+    600 27px/1.35 "Manrope",
+    sans-serif;
+  letter-spacing: -0.7px;
+  margin: 15px 0;
+}
+h3 {
+  font-size: 19px;
+}
+h4 {
+  margin-bottom: 8px;
+}
+.intro {
+  font-size: 18px;
+  line-height: 1.7;
+  max-width: 350px;
+  color: var(--muted);
+}
+.journey {
+  margin: 48px 0 64px;
+  max-width: 280px;
+}
+.journey p {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  color: #7c877d;
+  display: flex;
+  gap: 25px;
+}
+.journey span {
+  font-size: 14px;
+}
+.journey .current {
+  color: var(--green);
+  font-weight: 700;
+}
+.fine {
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--muted);
+}
+.panel {
+  background: var(--paper);
+  padding: 35px;
+  border: 1px solid #d9e0d4;
+  border-radius: 18px;
+  box-shadow: 0 10px 50px #344b3210;
+}
+.panel > p {
+  line-height: 1.6;
+}
+.selects {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 28px 0;
+}
+label {
+  font-size: 13px;
+  font-weight: 500;
+}
+select {
+  width: 100%;
+  display: block;
+  margin-top: 9px;
+  font: inherit;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 13px;
+  color: var(--ink);
+}
+fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+legend {
+  font-size: 13px;
+  margin-bottom: 13px;
+}
+.modegrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.modecard {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 17px;
+  cursor: pointer;
+  min-height: 139px;
+}
+.modecard.selected {
+  border: 1px solid #3e7755;
+  background: #edf3e7;
+}
+.modecard:has(input:disabled) {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.modecard input {
+  float: right;
+  accent-color: var(--green);
+}
+.modecard strong {
+  display: block;
+  font-size: 15px;
+  margin-bottom: 9px;
+}
+.modecard span {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--muted);
+  display: block;
+}
+.privacy {
+  background: #eef0e9;
+  border-radius: 10px;
+  padding: 15px;
+  margin: 24px 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.privacy p:first-child {
+  margin-top: 0;
+}
+.check {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.check input {
+  accent-color: var(--green);
+  margin-top: 4px;
+}
+.primary {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--green);
+  color: #fff;
+  border: 0;
+  border-radius: 9px;
+  padding: 16px 20px;
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+  margin-top: 24px;
+}
+button.primary:hover:not(:disabled) {
+  background: #164b36;
+}
+.fixture {
+  font-size: 11px;
+  background: #f4eddc;
+  border: 1px solid #e6d9b9;
+  border-radius: 8px;
+  padding: 12px;
+  color: #726137;
+  margin: 0 0 25px;
+  line-height: 1.5;
+}
+.notice {
+  background: #e7eee1;
+  padding: 12px;
+  border-radius: 8px;
+}
+.error {
+  background: #fcece5;
+  color: #8a3322;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+.error p {
+  margin-top: 0;
+}
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin: 28px 0 15px;
+}
+.tabs [aria-pressed="true"] {
+  background: #dce8d7;
+  border-color: #5e8064;
+}
+.recordbox {
+  border: 1px dashed #bdcbb8;
+  padding: 16px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.recordbox button {
+  margin: 4px 5px 4px 0;
+}
+.answerlabel {
+  display: block;
+}
+textarea {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  resize: vertical;
+  border: 1px solid #bbcbb9;
+  border-radius: 10px;
+  background: white;
+  color: var(--ink);
+  padding: 16px;
+  font:
+    15px/1.7 "DM Sans",
+    sans-serif;
+}
+progress {
+  width: 100%;
+  height: 5px;
+  accent-color: var(--green);
+  margin: 8px 0 20px;
+}
+.scoreline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.scoreline strong {
+  font-size: 30px;
+}
+.scoreline small {
+  font-size: 13px;
+  color: var(--muted);
+}
+.metrics {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 20px 0;
+}
+.metrics span {
+  padding: 10px;
+  border-radius: 7px;
+  background: #eaf0e4;
+  font-size: 12px;
+  text-transform: capitalize;
+}
+.metrics b {
+  margin-left: 10px;
+}
+li {
+  line-height: 1.7;
+  margin-bottom: 6px;
+}
+ul,
+ol {
+  padding-left: 22px;
+}
+blockquote {
+  margin: 20px 0;
+  padding: 15px;
+  border-left: 3px solid #789376;
+  background: #eff2e9;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+blockquote p {
+  font-size: 12px;
+  color: var(--muted);
+}
+details {
+  font-size: 13px;
+  line-height: 1.65;
+}
+summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.transcript {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.bigscore {
+  font:
+    600 80px "Manrope",
+    sans-serif;
+  letter-spacing: -5px;
+  color: var(--green);
+  margin-top: 25px;
+}
+.bigscore span {
+  font-size: 20px;
+  letter-spacing: 0;
+  color: var(--muted);
+  margin-left: 12px;
+}
+.answerdetail {
+  border-top: 1px solid var(--line);
+  padding: 20px 0;
+}
+.sessionactions {
+  margin-top: 30px;
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px;
+  font-size: 12px;
+}
+.sessionactions button {
+  font-size: 12px;
+}
+footer {
+  border-top: 1px solid var(--line);
+  padding: 25px 0;
+  font-size: 10px;
+  letter-spacing: 2px;
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+}
+footer span {
+  letter-spacing: 0;
+  font-size: 12px;
+}
+@media (max-width: 850px) {
+  main {
+    padding: 0 5vw;
+  }
+  .shell {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    margin-top: 30px;
+  }
+  aside {
+    position: static;
+  }
+  h1 {
+    max-width: 550px;
+    font-size: 43px;
+  }
+  .intro {
+    max-width: 500px;
+  }
+  .journey {
+    display: flex;
+    max-width: none;
+    gap: 15px;
+    margin: 25px 0;
+  }
+  .journey p {
+    flex: 1;
+    gap: 8px;
+    font-size: 10px;
+  }
+  .journey span {
+    font-size: 11px;
+  }
+  aside > .fine {
+    display: none;
+  }
+  .panel {
+    padding: 24px;
+  }
+  header {
+    height: 85px;
+  }
+  .badge {
+    font-size: 8px;
+  }
+  .brand > span {
+    font-size: 19px;
+  }
+}
+@media (max-width: 430px) {
+  .modegrid,
+  .selects {
+    grid-template-columns: 1fr;
+  }
+  .modecard {
+    min-height: auto;
+  }
+  h1 {
+    font-size: 36px;
+  }
+  .panel {
+    padding: 20px;
+  }
+  .tabs button {
+    font-size: 12px;
+  }
+  .badge {
+    max-width: 135px;
+    text-align: center;
+  }
+  .journey {
+    gap: 8px;
+  }
+  footer span {
+    max-width: 170px;
+    text-align: right;
+  }
+}
