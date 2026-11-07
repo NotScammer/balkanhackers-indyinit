@@ -13,7 +13,7 @@ export class RequestError extends Error {
     super(message);
   }
 }
-async function request<T>(
+export async function request<T>(
   path: string,
   init: RequestInit = {},
   id?: string,

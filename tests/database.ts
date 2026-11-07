@@ -9,6 +9,7 @@ export class TestDatabase implements Database {
     await sql.exec('create role anon; create role authenticated; create role service_role bypassrls;');
     await sql.exec(await readFile('supabase/migrations/202611070001_backend.sql', 'utf8'));
     await sql.exec(await readFile('supabase/migrations/202611070002_research_persistence.sql', 'utf8'));
+    await sql.exec(await readFile('supabase/migrations/202611070003_live_conversation.sql', 'utf8'));
     return new TestDatabase(sql);
   }
   async rpc<T>(name: string, args: Record<string, unknown> = {}): Promise<T> {

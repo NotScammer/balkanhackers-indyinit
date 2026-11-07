@@ -1,4 +1,5 @@
 import 'server-only';
+import { createLiveApi } from './live/api';
 import { createSessionSchema, completeTurnSchema } from '@/shared/schemas';
 import { authorize, hashToken } from './auth';
 import { catalog, validateCombination } from './catalog';
@@ -21,6 +22,7 @@ export function createApi(deps: ApiDependencies) {
     if (!await db.rpc<boolean>('consume_rate', { p_key: key, p_limit: limit, p_seconds: seconds })) throw new AppError('RATE_LIMITED', 429, 'Request budget exceeded. Try again later.', true);
   }
   return {
+    live: createLiveApi(deps),
     frontendGet: (request: Request, id: string) => handle(async () => {
       const state = await authorize(db, sessionId(id), request);
       return json({ ...sessionView(state), answers: state.answers.filter(a => a.processing_status === 'done' && a.evaluation).map(a => ({ answerId: a.id, questionId: a.question_id, transcript: a.transcript, evaluation: answerEvaluation(a.evaluation!) })) });

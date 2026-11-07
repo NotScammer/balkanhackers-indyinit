@@ -43,7 +43,8 @@ SQL Editor method:
 1. Create a Supabase project and open its SQL Editor as an administrator.
 2. Run **all** of `supabase/migrations/202611070001_backend.sql` once.
 3. Run **all** of `supabase/migrations/202611070002_research_persistence.sql` once.
-4. Confirm both transactions succeeded. Run the read-only verification queries below.
+4. Run **all** of `supabase/migrations/202611070003_live_conversation.sql` once.
+5. Confirm all three transactions succeeded. Run the read-only verification queries below.
 
 Supabase CLI method (install the CLI separately using its official instructions):
 
@@ -137,7 +138,7 @@ Immediate access expiry is implemented. Eventual cleanup runs at the beginning o
 
 ## Account-backed rehearsal remaining
 
-- [ ] Apply/verify both hosted migrations and server role grants.
+- [ ] Apply/verify all three hosted migrations and server role grants.
 - [ ] Load actual metadata through the verified seed; confirm `dataMode: verified` in creation.
 - [ ] Complete three typed turns using live Claude, check persisted questions/evaluations and final arithmetic.
 - [ ] Retry one successful answer with the same payload; confirm unchanged result and no additional model call.
@@ -148,3 +149,5 @@ Immediate access expiry is implemented. Eventual cleanup runs at the beginning o
 - [ ] Confirm provider budget and retention settings. No live provider, hosted migration or deployed cron success is claimed by local automated checks.
 
 The integrated recording UI also requires `OPENAI_TTS_MODEL` and `OPENAI_TTS_VOICE` (blank defaults to `alloy`). See the [official OpenAI audio API](https://developers.openai.com/api/reference/typescript/resources/audio). Rebuild after changing the public mock flag.
+
+For the live voice frontend, follow [LIVE_INTERVIEW.md](LIVE_INTERVIEW.md). The Realtime and transcription model settings are required for live audio; separate TTS settings are optional legacy recorded-mode settings.

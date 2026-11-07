@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import LiveInterview from "./LiveInterview";
 import { useRouter } from "next/navigation";
 import { api, isMock, tokenKey } from "../lib/client/api";
 import { useInterview } from "../hooks/useInterview";
@@ -19,6 +20,7 @@ export default function InterviewApp({
   sessionId?: string;
   results?: boolean;
 }) {
+  if (sessionId && !isMock) return <LiveInterview key={sessionId} id={sessionId} />;
   return sessionId ? (
     <VoiceRoom
       key={`${sessionId}:${results}`}

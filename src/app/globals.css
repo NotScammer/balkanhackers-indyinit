@@ -497,3 +497,14 @@ footer {
     scroll-behavior: auto !important;
   }
 }
+
+.live-player { width: min(100%, 400px); margin: 12px 0 24px; height: 36px; }
+.live-controls { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
+.live-status { color: var(--muted); min-height: 24px; }
+.live-notes, .live-recovery, .live-report { border-top: 1px solid var(--line); margin-top: 28px; padding-top: 20px; }
+.live-history { margin: 28px 0; }
+.live-message { padding: 14px 18px; border-left: 2px solid var(--line); margin: 16px 0; }
+.live-message.candidate { border-color: var(--muted); }
+.live-message .transcript { white-space: pre-wrap; overflow-wrap: anywhere; }
+.live-correction textarea { width: 100%; min-height: 140px; box-sizing: border-box; padding: 12px; margin: 12px 0; color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+.live-correction button, .live-recovery button { margin: 6px 10px 6px 0; }

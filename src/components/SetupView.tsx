@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { api, tokenKey } from "../lib/client/api";
+import { api, tokenKey, isMock } from "../lib/client/api";
 import type { Catalog, Setup } from "../lib/client/contracts";
 import { modes } from "../lib/client/interview-model";
 import { canRecord, useRecorder } from "../hooks/useRecorder";
@@ -22,7 +22,7 @@ export default function SetupView() {
       .then((c) => {
         if (!live) return;
         setCatalog(c);
-        setSupported(canRecord());
+        setSupported(isMock ? canRecord() : !!navigator.mediaDevices?.getUserMedia && typeof RTCPeerConnection !== 'undefined');
         const first = c.availableInterviews[0];
         if (!first) {
           setError("No practice is available yet. Please try again later.");
@@ -72,7 +72,7 @@ export default function SetupView() {
   };
   async function begin() {
     if (busy) return;
-    if (!setup?.audioProcessingConsent || !canRecord()) {
+    if (!setup?.audioProcessingConsent || !supported) {
       setError(
         "Allow audio processing and use a browser with microphone recording to start.",
       );
@@ -182,15 +182,11 @@ export default function SetupView() {
         </div>
       </fieldset>
       <p className="fine">
-        Up to {modes[setup.round].limit} per answer. No coding required.
+        Three main questions, with up to two deeper follow-ups each. No coding required.
       </p>
       <div className="privacy">
         <p>
-          In live practice, confirmed answers go to AI providers for feedback.
-          With your consent, recordings are uploaded for transcription. The
-          backend is responsible for discarding uploaded audio and enforcing
-          session retention; provider retention may differ. You can delete your
-          session.
+          When you connect live audio, your microphone streams to OpenAI while unmuted. Transcripts go to Claude for questions, clarification and feedback, and are saved with your session. Audio is not stored by this application; provider retention may differ.
         </p>
         <label className="check">
           <input
@@ -204,8 +200,7 @@ export default function SetupView() {
           I consent to audio processing for transcription.
         </label>
         <p>
-          This interview uses voice answers. Your microphone opens only when you
-          choose to speak.
+          Your microphone opens when you connect live audio, then stays open until you mute, disconnect or end the interview.
         </p>
       </div>
       {!supported && (
@@ -226,12 +221,11 @@ export default function SetupView() {
         <div className="welcome">
           <h2>Let’s take it one question at a time.</h2>
           <p>
-            Listen to each question, then tap the microphone to answer. You can
-            listen back and confirm the transcript before receiving feedback.
+            {isMock ? "This is the recorded-answer fixture preview." : "Speak naturally and interrupt whenever you need clarification. Answers advance automatically; you can correct recognition mistakes in the transcript. Feedback is spoken and shown after each answer, with scores at the end."}
           </p>
           <p>
             {setup.audioProcessingConsent
-              ? "You’ll answer out loud. Re-record whenever you need to."
+              ? "You’ll answer out loud. Clarify, pause or correct your transcript whenever you need to."
               : "Allow audio processing above to start a voice interview."}
           </p>
           {setup.audioProcessingConsent && (

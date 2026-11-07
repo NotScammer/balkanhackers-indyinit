@@ -1,3 +1,7 @@
+# Current live conversation contract
+
+The integrated real frontend uses `/sessions/:id/live` and `/sessions/:id/live/token`, with three main questions, up to two follow-ups per main question, automatic transcripts, clarification and final grouped scores. See [LIVE_INTERVIEW.md](LIVE_INTERVIEW.md) and `src/shared/live.ts`. The recorded-answer contracts below remain available to older clients. Do not mix the two progression endpoints within one session.
+
 # Frontend integration contract
 
 Developer A owns pages, components, styles, microphone UI and WebRTC. Developer B owns the API and shared contracts. Import **types only** from `src/shared/contracts.ts` in browser code; runtime request schemas are in `src/shared/schemas.ts`. Coordinate changes to either shared file. See [setup](SETUP.md) for credentials/migrations and [architecture](BACKEND_ARCHITECTURE.md) for backend details.
